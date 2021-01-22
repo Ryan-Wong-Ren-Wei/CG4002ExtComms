@@ -12,7 +12,7 @@ with SSHTunnelForwarder(
     REMOTE_SERVER_IP,
     ssh_username=username,
     ssh_password=password,
-    remote_bind_address=(PRIVATE_SERVER_IP, 22),
+    remote_bind_address=(PRIVATE_SERVER_IP, 10022),
     local_bind_address=('0.0.0.0', 10022)
 ) as tunnel:
     # client = paramiko.SSHClient()
