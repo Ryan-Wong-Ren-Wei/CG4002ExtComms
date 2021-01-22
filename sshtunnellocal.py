@@ -14,17 +14,23 @@ with SSHTunnelForwarder(
     ssh_username=username,
     ssh_password=password,
     remote_bind_address=(PRIVATE_SERVER_IP, 22),
-    local_bind_address=('0.0.0.0', 10022)
+    local_bind_address=('localhost', 10022)
 ) as tunnel1:
+    print('Tunnel opened to sunfire.comp.nus.edu.sg with...')
+    print('Address: ' + str(tunnel1.local_bind_address))
+    print('Port no: ' + str(tunnel1.local_bind_port))
     with SSHTunnelForwarder(
-        ('127.0.0.1', tunnel1.local_bind_port),
+        ('localhost', 10022),
         ssh_username='xilinx',
         ssh_password='xilinx',
-        remote_bind_address=('127.0.0.1', 10022),
-        local_bind_address=('127.0.0.1', 10022)
+        remote_bind_address=('localhost', 10022),
+        local_bind_address=('localhost', 8080)
     ) as tunnel2:
+        print('Tunnel opened to ultra96 board with...')
+        print('Address: ' + str(tunnel2.local_bind_address))
+        print('Port no: ' + str(tunnel2.local_bind_port))
         host = '127.0.0.1'
-        port = 10022
+        port = 8080
          
         mySocket = socket.socket()
         mySocket.connect((host,port))
