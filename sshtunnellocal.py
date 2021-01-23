@@ -3,8 +3,13 @@ import paramiko
 import getpass
 import socket
 from sshtunnel import SSHTunnelForwarder
+from Cryptodome.Cipher import AES
+
 REMOTE_SERVER_IP = 'sunfire.comp.nus.edu.sg'
 PRIVATE_SERVER_IP = '137.132.86.228'
+
+KEY = b'\x01\x80\xba\x82\x7a\xc8\x7a\x3a\x26\xf1\xca\xc6\x9e\x1c\x3c\xbe'
+cipher = AES.new(KEY, AES.MODE_EAX)
 
 username = input("Enter ssh username: ")
 password =  getpass.getpass("Enter ssh password: ")
@@ -32,18 +37,20 @@ with SSHTunnelForwarder(
         host = '127.0.0.1'
         port = 8080
          
-        mySocket = socket.socket()
+        mySocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         mySocket.connect((host,port))
          
         message = input(" -> ")
          
         while message != 'q':
-                mySocket.send(message.encode())
-                data = mySocket.recv(1024).decode()
-                 
-                print ('Received from server: ' + data)
-                 
-                message = input(" -> ")
+            ciphertext, tag = cipher.encrypt_and_digest(message)
+
+            mySocket.send(ciphertext.encode())
+            data = mySocket.recv(1024).decode()
+                
+            print ('Received from server: ' + data)
+                
+            message = input(" -> ")
                  
         mySocket.close()
     
