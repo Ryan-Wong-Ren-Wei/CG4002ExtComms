@@ -1,5 +1,4 @@
 from threading import local
-import paramiko
 import getpass
 import socket
 from sshtunnel import SSHTunnelForwarder
