@@ -1,11 +1,7 @@
 import socket
-from Cryptodome.Cipher import AES
-from Cryptodome.Util.Padding import pad, unpad
-from Cryptodome.Random import get_random_bytes
 from base64 import b64encode, b64decode
 from getpass import getpass
-from encryption import EncryptionHandler
-import json
+from Util.encryption import EncryptionHandler
  
 def startServer(host : str, port : int):
     mySocket = socket.socket()

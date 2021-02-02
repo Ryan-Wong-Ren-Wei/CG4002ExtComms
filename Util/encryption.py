@@ -17,11 +17,9 @@ class EncryptionHandler():
         cipher = AES.new(self.key, AES.MODE_CBC)
         message += ' ' * (16 - len(message) % 16)
         ct_bytes = cipher.encrypt(message.encode())
-        print(AES.block_size)
         iv = cipher.iv
-        ct = ct_bytes
         # json_bytes = json.dumps({'iv': iv, 'ciphertext': ct}).encode()
-        encryptedMessage = b64encode(cipher.iv + ct_bytes)
+        encryptedMessage = b64encode(iv + ct_bytes)
         print(encryptedMessage)
         return encryptedMessage
 

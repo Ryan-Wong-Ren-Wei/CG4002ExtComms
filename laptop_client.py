@@ -7,7 +7,7 @@ from Cryptodome.Util.Padding import pad
 from Cryptodome.Random import get_random_bytes
 from base64 import b64encode
 import json
-from encryption import EncryptionHandler
+from Util.encryption import EncryptionHandler
 
 REMOTE_SERVER_IP = 'sunfire.comp.nus.edu.sg'
 PRIVATE_SERVER_IP = '137.132.86.228'
