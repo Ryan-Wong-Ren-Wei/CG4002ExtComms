@@ -7,12 +7,14 @@ from Cryptodome.Util.Padding import pad
 from Cryptodome.Random import get_random_bytes
 from base64 import b64encode
 import json
+from encryption import EncryptionHandler
+
 REMOTE_SERVER_IP = 'sunfire.comp.nus.edu.sg'
 PRIVATE_SERVER_IP = '137.132.86.228'
 
 username = input("Enter ssh username: ")
 password =  getpass.getpass("Enter ssh password: ")
-key = b'Sixteen byte key' #remember to hide
+key = 'Sixteen byte key' #remember to hide
 
 with SSHTunnelForwarder(
     REMOTE_SERVER_IP,
@@ -43,12 +45,9 @@ with SSHTunnelForwarder(
         message = input(" -> ")
          
         while message != 'q':
-            cipher = AES.new(key, AES.MODE_CBC)
-            ct_bytes = cipher.encrypt(pad(message.encode(), AES.block_size))
-            iv = b64encode(cipher.iv).decode('utf-8')
-            ct = b64encode(ct_bytes).decode('utf-8')
-            json_bytes = json.dumps({'iv': iv, 'ciphertext': ct}).encode()
-            mySocket.send(json_bytes)
+            encryptionHandler = EncryptionHandler(key.encode())
+            encrypted_msg = encryptionHandler.encrypt_msg
+            mySocket.send(encrypted_msg)
             data = mySocket.recv(1024).decode()
                 
             print ('Received from server: ' + data)
