@@ -13,7 +13,7 @@ class EncryptionHandler():
     def __init__(self, key: bytes):
         self.key = key
 
-    def encrypt_msg():
+    def encrypt_msg(self, message):
         cipher = AES.new(key, AES.MODE_CBC)
         message += ' ' * (16 - len(message) % 16)
         ct_bytes = cipher.encrypt(message.encode())

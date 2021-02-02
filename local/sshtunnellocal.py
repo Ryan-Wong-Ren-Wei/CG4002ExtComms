@@ -46,7 +46,7 @@ with SSHTunnelForwarder(
          
         while message != 'q':
             encryptionHandler = EncryptionHandler(key.encode())
-            encrypted_msg = encryptionHandler.encrypt_msg
+            encrypted_msg = encryptionHandler.encrypt_msg(message)
             mySocket.send(encrypted_msg)
             data = mySocket.recv(1024).decode()
                 
@@ -57,4 +57,4 @@ with SSHTunnelForwarder(
         mySocket.close()
     
 
-print('FINISH!')
+print('Closing connection')
