@@ -1,4 +1,20 @@
 import socket
+import time 
+import sys
+
+def startClockSync(socket):
+    timeSend = time.time()
+    socket.send(("@CS" + str(timeSend)).encode("utf8"))
+
+    response = socket.recv(1024).decode('utf8')
+    response = response.split("|")
+    timerecv = time.time()
+
+    RTT = (float(response[0]) - timeSend) - \
+        (float(response[1]) - timerecv)
+    print(RTT)
+    print(response)
+
 
 host = '127.0.0.1'
 port = 10022
@@ -10,14 +26,15 @@ for _ in range(3):
     mySocket.connect((host,port))   
     socketList.append(mySocket)
 
-command = input("Enter as follows: Dancer ID|Message -> ")
+# handleClockSync(socketList)
+command = input("type quit to quit -> ")
 while command != "quit":
-    command = command.split("|")
-    currSocket = socketList[int(command[0])]
-    print(currSocket)
-    currSocket.send(command[1].encode())
-    command = input("Enter as follows: Dancer ID|Message -> ")
+    for socket in socketList:
+        startClockSync(socket)
+    # time.sleep(30)
+    command = input("type quit to quit -> ")
 
 for socket in socketList:
+    socket.send(b"shutdown")
     socket.close()
 print("Quitting now")

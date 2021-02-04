@@ -3,6 +3,7 @@ import sys
 import json
 import threading
 import concurrent.futures
+import time
 
 class Ultra96Server:
     dancerList = None
@@ -11,20 +12,36 @@ class Ultra96Server:
     def __init__(self):
         return
 
-    def handleClient(self, conn, addr):
-        print("hello")
+    def parseClockSync(self, data : str, dancerID : int, timerecv):
+        print(f"Received clock sync request from dancer, {dancerID}")
+        timestamp = data[3:]
+        print(f"t1 =",{timestamp})
+
+        response = str(timerecv) + "|" + str(time.time())
+
+        conn,addr = self.dancerList[dancerID]
+        conn.send(response.encode())
+        
+
+    def handleClient(self, dancerID):
+        conn,addr = self.dancerList[dancerID]
         try:
             print(f"Handling: \n {conn} \n {addr}")
             # print(conn,addr)
             while True:
-                data = conn.recv(1024)
+                data = conn.recv(1024).decode("utf8")
+                timerecv = time.time()
                 # print(data.decode("utf8"))
-                if not data:
-                    print('no data')
+                if data == "shutdown":
+                    print('Received shutdown signal')
                     break
+                elif data[0:3] == "@CS":
+                    self.parseClockSync(data, dancerID, timerecv)
+                    
                 # decrypted_msg = encryptionHandler.decrypt_message(data)
-                print(f"Message received: ", {data.decode('utf8')})
-                conn.send("Received msg, awaiting next msg".encode())
+                else:    
+                    print(f"Message received:", {data}, "from dancer:", {dancerID})
+                    conn.send("Received msg, awaiting next msg".encode())
             print("RETURNING")
         except:
             print(sys.exc_info())
@@ -42,9 +59,6 @@ class Ultra96Server:
                 tempDancerList.append((conn, addr))
 
             self.dancerList = tempDancerList
-            for conn,addr in self.dancerList:
-                print(conn)
-                print(addr)
             return 
         except:
             print(sys.exc_info()[0])
@@ -52,46 +66,14 @@ class Ultra96Server:
             # for conn, addr in tempDancerList:
             #     conn.close()
 
-def handleClient(self, conn, addr):
-    print("hello")
-    try:
-        print(f"Handling: \n {conn} \n {addr}")
-        # print(conn,addr)
-        while True:
-            data = conn.recv(1024)
-            # print(data.decode("utf8"))
-            if not data:
-                print('no data')
-                break
-            # decrypted_msg = encryptionHandler.decrypt_message(data)
-            print(f"Message received: ", {data.decode('utf8')})
-            conn.send("Received msg, awaiting next msg".encode())
-        print("RETURNING")
-    except:
-        print(sys.exc_info())
-
 ultra96Server = Ultra96Server()
 ultra96Server.initializeConnections('127.0.0.1', 10022)
 
-# executor = concurrent.futures.ThreadPoolExecutor()
+executor = concurrent.futures.ThreadPoolExecutor()
 
-
-with concurrent.futures.ThreadPoolExecutor() as executor:
-    for conn, addr in ultra96Server.dancerList:
-        executor.submit(ultra96Server.handleClient, conn,addr)
-    # conn,addr = ultra96Server.dancerList[0]
-    # executor.submit(handleClient, conn, addr)
+for dancerID in range(len(ultra96Server.dancerList)):
+    executor.submit(ultra96Server.handleClient, dancerID)
 
 executor.shutdown()
-# for conn, addr in ultra96Server.dancerList:
-#     conn.close()
-
-# executor.shutdown(wait=True)
-
-# for conn,addr in ultra96Server.dancerList:
-#     conn.close()
-
-# input("Press any key and Enter to close -> ")
-
-# print(ultra96Server.messageList)
-
+for conn, addr in ultra96Server.dancerList:
+    conn.close()
