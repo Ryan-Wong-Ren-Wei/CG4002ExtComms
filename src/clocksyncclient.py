@@ -19,21 +19,17 @@ def startClockSync(socket):
 
     response = socket.recv(1024).decode('utf8')
     response = response.split("|")
-    timerecv = time.time()
+    timeRecv = time.time()
 
     print(f"t1:", {timeSend}, "t2:", \
-        {response[0]}, "t3:", {response[1]}, "t4:", timerecv)
-    RTT = (float(response[0]) - timeSend) - \
-        (float(response[1]) - timerecv)
-    print(f"RTT:", {RTT})
-
-    clockOffset = []
-    clockOffset.append(float(response[1]) - timerecv + RTT/2)
-    clockOffset.append(float(response[0]) - timeSend - RTT/2)
-    print("All clock offsets calculated:")
-    print(clockOffset)
-    avgClockOffset = (clockOffset[0] + clockOffset[1])/2
-    print("Clock offset:", {avgClockOffset})
+        {response[0]}, "t3:", {response[1]}, "t4:", {timeRecv})
+    t = [timeSend, float(response[0]), float(response[1]), timeRecv]
+    
+    roundTripTime = (t[3] - t[0]) - (t[2] - t[1])
+    print("RTT:", {roundTripTime})
+    
+    clockOffset = ((t[1] - t[0]) + (t[2] - t[3]))/2 
+    print("Clock offset:", {clockOffset})
     print("\n")
 
 
@@ -73,7 +69,6 @@ with SSHTunnelForwarder(
             mySocket.connect((host,port))   
             socketList.append(mySocket)
 
-        # handleClockSync(socketList)
         command = input("type quit to quit -> ")
         while command != "quit":
             dancerID = 0

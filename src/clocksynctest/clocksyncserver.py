@@ -20,7 +20,7 @@ class Ultra96Server:
         response = str(timerecv) + "|" + str(time.time())
 
         conn,addr = self.dancerList[dancerID]
-        conn.send(response.encode(``))
+        conn.send(response.encode())
         
 
     def handleClient(self, dancerID):
