@@ -11,10 +11,10 @@ import json
 import socket
 from Util.encryption import EncryptionHandler
 
-
 def startClockSync(currSocket):
     timeSend = time.time()
-    currSocket.send(("@CS" + str(timeSend)).encode("utf8"))
+    messagedict = {"command" : "CS", "message" : str(timeSend)}
+    currSocket.send((json.dumps(messagedict)).encode("utf8"))
 
     response = currSocket.recv(1024).decode('utf8')
     response = response.split("|")
@@ -28,8 +28,15 @@ def startClockSync(currSocket):
     print("RTT:", {roundTripTime})
     
     clockOffset = ((t[1] - t[0]) + (t[2] - t[3]))/2 
+    messagedict = {"command" : "offset", "message" : str(clockOffset)}
+    currSocket.send((json.dumps(messagedict)).encode("utf8"))
     print("Clock offset:", {clockOffset})
     print("\n")
+
+def sendTimeStamp(currSocket, timestamp: float):
+    messagedict = {"command" : "evaluateMove", "message" : str(timestamp)}
+    currSocket.send((json.dumps(messagedict)).encode())
+    return
 
 def connectTo96(host,port):
     key = 'Sixteen byte key'
@@ -41,18 +48,25 @@ def connectTo96(host,port):
 
     command = input("type quit to quit -> ")
     while command != "quit":
-        dancerID = 0
-        for currSocket in socketList:
-            print(f"Clock syncing for dancer:",{dancerID})
-            startClockSync(currSocket)
-            dancerID += 1
-        # time.sleep(30)
+        if command == "sync":
+            dancerID = 0
+            for currSocket in socketList:
+                print(f"Clock syncing for dancer:",{dancerID})
+                startClockSync(currSocket)
+                dancerID += 1
+        if command == "timestamp":
+            dancerID = 0
+            for currSocket in socketList:
+                timestamp = time.time()
+                print("Spoofing timestamp for dancer " + str(dancerID) + ":" + str(timestamp))
+                sendTimeStamp(currSocket, timestamp)
+                time.sleep(1)
         command = input("type quit to quit -> ")
 
     x = 0
     for currSocket in socketList:
         print("Shutting down dancer number " + str(x))
-        currSocket.send(b"shutdown")
+        currSocket.send((json.dumps({'command' : 'shutdown'})).encode())
         currSocket.close()
         x += 1
     print("Quitting now")

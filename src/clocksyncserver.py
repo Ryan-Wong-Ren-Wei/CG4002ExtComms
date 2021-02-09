@@ -7,14 +7,25 @@ import time
 
 class Ultra96Server:
     dancerList = None
-    messageList = []
+    currTimeStamps = [0, 0, 0]
+    clockOffsets = [0,0,0]
 
     def __init__(self):
         return
 
-    def parseClockSync(self, data : str, dancerID : int, timerecv):
+    def updateTimeStamp(self, message : str, dancerID : int):
+        print("Evaluating move...")
+        print(f"time recorded by bluno:", {message})
+
+        #calculate relative time using offset
+        timestamp = float(message)
+        relativeTS = timestamp - self.clockOffsets[dancerID - 1]
+        self.currTimeStamps[dancerID - 1] = relativeTS
+        return
+
+    def respondClockSync(self, message : str, dancerID : int, timerecv):
         print(f"Received clock sync request from dancer, {dancerID}")
-        timestamp = data[3:]
+        timestamp = message
         print(f"t1 =",{timestamp})
 
         response = str(timerecv) + "|" + str(time.time())
@@ -22,6 +33,10 @@ class Ultra96Server:
         conn,addr = self.dancerList[dancerID]
         conn.send(response.encode())
         
+    def updateOffset(self, message: str, dancerID: int):
+        self.clockOffsets[dancerID - 1] = float(message)
+        print("Updating dancer " + str(dancerID) + " offset to: " + message)
+        return
 
     def handleClient(self, dancerID):
         conn,addr = self.dancerList[dancerID]
@@ -29,19 +44,23 @@ class Ultra96Server:
             print(f"Handling: \n {conn} \n {addr}")
             # print(conn,addr)
             while True:
-                data = conn.recv(1024).decode("utf8")
+                data = json.loads(conn.recv(1024).decode("utf8"))
+                print("Received data:" + json.dumps(data))
                 timerecv = time.time()
                 # print(data.decode("utf8"))
-                if data == "shutdown":
+
+                print(dancerID)
+                if data['command'] == "shutdown":
                     print('Received shutdown signal')
                     break
-                elif data[0:3] == "@CS":
-                    self.parseClockSync(data, dancerID, timerecv)
+                elif data['command'] == "CS":
+                    self.respondClockSync(data['message'], dancerID, timerecv)
+                elif data['command'] == "offset":
+                    self.updateOffset(data['message'], dancerID)
+                elif data['command'] == "evaluateMove":
+                    self.updateTimeStamp(data['message'], dancerID)
                     
                 # decrypted_msg = encryptionHandler.decrypt_message(data)
-                else:    
-                    print(f"Message received:", {data}, "from dancer:", {dancerID})
-                    conn.send("Received msg, awaiting next msg".encode())
             print("RETURNING")
         except:
             print(sys.exc_info())
@@ -71,9 +90,15 @@ ultra96Server.initializeConnections('127.0.0.1', 10022)
 
 executor = concurrent.futures.ThreadPoolExecutor()
 
+
 for dancerID in range(len(ultra96Server.dancerList)):
     executor.submit(ultra96Server.handleClient, dancerID)
 
 executor.shutdown()
+
+print(f"offsets:", {str(ultra96Server.clockOffsets)})
+timestamps = sorted(ultra96Server.currTimeStamps)
+print(f"timestamps recorded:" , {str(timestamps)})
+print(f"Sync delay:", {timestamps[2] - timestamps[0]})
 for conn, addr in ultra96Server.dancerList:
     conn.close()
