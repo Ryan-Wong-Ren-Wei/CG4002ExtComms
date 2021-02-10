@@ -60,7 +60,7 @@ def connectTo96(host,port):
                 timestamp = time.time()
                 print("Spoofing timestamp for dancer " + str(dancerID) + ":" + str(timestamp))
                 sendTimeStamp(currSocket, timestamp)
-                time.sleep(0.1)
+                time.sleep(0.2)
         command = input("type quit to quit -> ")
 
     x = 0

@@ -8,7 +8,12 @@ import time
 class Ultra96Server:
     dancerList = None
     currTimeStamps = [0,0,0]
-    clockOffsets = [0,0,0]
+    last10Offsets = []
+    for _ in range(10):
+        last10Offsets.append([None,None,None])
+    currIndexClockOffset = [9,9,9]
+
+    currAvgOffsets = [None, None, None]
 
     offsetLock = threading.Lock()
     timestampLock = threading.Lock()
@@ -22,7 +27,7 @@ class Ultra96Server:
 
         #calculate relative time using offset
         timestamp = float(message)
-        relativeTS = timestamp - self.clockOffsets[dancerID - 1]
+        relativeTS = timestamp - self.currAvgOffsets[dancerID - 1]
 
         self.timestampLock.acquire()
         self.currTimeStamps[dancerID - 1] = relativeTS
@@ -39,11 +44,29 @@ class Ultra96Server:
 
         conn, addr = self.dancerList[dancerID]
         conn.send(response.encode())
+
+    # Must be called after acquiring offsetlock
+    def updateAvgOffsets(self):
+        avgOffsets = [0,0,0]
+        for offsets in self.last10Offsets:
+            if offsets[0] is None or offsets[1] is None or offsets[2] is None:
+                continue
+            for currID in range(len(offsets)):
+                avgOffsets[currID] += offsets[currID]
+        
+        self.currAvgOffsets = avgOffsets
+        return avgOffsets
+            
         
     def updateOffset(self, message: str, dancerID: int):
         self.offsetLock.acquire()
-        self.clockOffsets[dancerID - 1] = float(message)
+        print(f"{dancerID} has received offsetlock")
+        self.last10Offsets[self.currIndexClockOffset[dancerID - 1]][dancerID - 1] = float(message)
+        self.currIndexClockOffset[dancerID - 1] = (self.currIndexClockOffset[dancerID - 1] - 1) % 10
+        self.updateAvgOffsets()
+        print(f"{dancerID} is releasing offsetlock")
         self.offsetLock.release()
+
         print("Updating dancer " + str(dancerID) + " offset to: " + message)
         return
 
@@ -106,7 +129,7 @@ if __name__ == "__main__":
 
     executor.shutdown()
 
-    print(f"offsets:", {str(ultra96Server.clockOffsets)})
+    print(f"offsets:", {str(ultra96Server.last10Offsets)})
     timestamps = sorted(ultra96Server.currTimeStamps)
     print(f"timestamps recorded:" , {str(timestamps)})
     print(f"Sync delay:", {timestamps[2] - timestamps[0]})
