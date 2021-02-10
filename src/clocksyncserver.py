@@ -7,8 +7,10 @@ import time
 
 class Ultra96Server:
     dancerList = None
-    currTimeStamps = [0, 0, 0]
+    currTimeStamps = [0,0,0]
     clockOffsets = [0,0,0]
+
+    offsetLock = threading.Lock()
 
     def __init__(self):
         return
@@ -34,7 +36,12 @@ class Ultra96Server:
         conn.send(response.encode())
         
     def updateOffset(self, message: str, dancerID: int):
+        while(self.offsetLock.locked()):
+            continue
+
+        self.offsetLock.acquire()
         self.clockOffsets[dancerID - 1] = float(message)
+        self.offsetLock.release()
         print("Updating dancer " + str(dancerID) + " offset to: " + message)
         return
 
@@ -85,20 +92,21 @@ class Ultra96Server:
             # for conn, addr in tempDancerList:
             #     conn.close()
 
-ultra96Server = Ultra96Server()
-ultra96Server.initializeConnections('127.0.0.1', 10022)
+if __name__ == "__main__":
+    ultra96Server = Ultra96Server()
+    ultra96Server.initializeConnections('127.0.0.1', 10022)
 
-executor = concurrent.futures.ThreadPoolExecutor()
+    executor = concurrent.futures.ThreadPoolExecutor()
 
 
-for dancerID in range(len(ultra96Server.dancerList)):
-    executor.submit(ultra96Server.handleClient, dancerID)
+    for dancerID in range(len(ultra96Server.dancerList)):
+        executor.submit(ultra96Server.handleClient, dancerID)
 
-executor.shutdown()
+    executor.shutdown()
 
-print(f"offsets:", {str(ultra96Server.clockOffsets)})
-timestamps = sorted(ultra96Server.currTimeStamps)
-print(f"timestamps recorded:" , {str(timestamps)})
-print(f"Sync delay:", {timestamps[2] - timestamps[0]})
-for conn, addr in ultra96Server.dancerList:
-    conn.close()
+    print(f"offsets:", {str(ultra96Server.clockOffsets)})
+    timestamps = sorted(ultra96Server.currTimeStamps)
+    print(f"timestamps recorded:" , {str(timestamps)})
+    print(f"Sync delay:", {timestamps[2] - timestamps[0]})
+    for conn, addr in ultra96Server.dancerList:
+        conn.close()

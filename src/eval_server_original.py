@@ -93,10 +93,10 @@ class Server(threading.Thread):
     def run(self):
         while not self.shutdown.is_set():
             data = self.connection.recv(1024)
-
             if data:
                 try:
                     msg = data.decode("utf8")
+                    print(f"msg", {msg})
                     decrypted_message = self.decrypt_message(msg)
                     if decrypted_message['action'] == "logout":
                         self.logout = True
