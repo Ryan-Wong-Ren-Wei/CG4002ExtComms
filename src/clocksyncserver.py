@@ -11,6 +11,7 @@ class Ultra96Server:
     clockOffsets = [0,0,0]
 
     offsetLock = threading.Lock()
+    timestampLock = threading.Lock()
 
     def __init__(self):
         return
@@ -22,7 +23,13 @@ class Ultra96Server:
         #calculate relative time using offset
         timestamp = float(message)
         relativeTS = timestamp - self.clockOffsets[dancerID - 1]
+
+        while self.timestampLock.locked():
+            continue
+        self.timestampLock.acquire()
         self.currTimeStamps[dancerID - 1] = relativeTS
+        self.timestampLock.release()
+
         return
 
     def respondClockSync(self, message : str, dancerID : int, timerecv):
@@ -32,7 +39,7 @@ class Ultra96Server:
 
         response = str(timerecv) + "|" + str(time.time())
 
-        conn,addr = self.dancerList[dancerID]
+        conn, addr = self.dancerList[dancerID]
         conn.send(response.encode())
         
     def updateOffset(self, message: str, dancerID: int):
