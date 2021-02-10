@@ -24,8 +24,6 @@ class Ultra96Server:
         timestamp = float(message)
         relativeTS = timestamp - self.clockOffsets[dancerID - 1]
 
-        while self.timestampLock.locked():
-            continue
         self.timestampLock.acquire()
         self.currTimeStamps[dancerID - 1] = relativeTS
         self.timestampLock.release()
@@ -43,9 +41,6 @@ class Ultra96Server:
         conn.send(response.encode())
         
     def updateOffset(self, message: str, dancerID: int):
-        while(self.offsetLock.locked()):
-            continue
-
         self.offsetLock.acquire()
         self.clockOffsets[dancerID - 1] = float(message)
         self.offsetLock.release()
