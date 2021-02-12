@@ -19,9 +19,9 @@ def startClockSync(currSocket):
     currSocket.send((json.dumps(messagedict)).encode("utf8"))
 
     response = currSocket.recv(1024).decode('utf8')
-    response = response.split("|")
     timeRecv = time.time()
-
+    response = response.split("|")
+    
     print(f"t1:", {timeSend}, "t2:", \
         {response[0]}, "t3:", {response[1]}, "t4:", {timeRecv})
     t = [timeSend, float(response[0]), float(response[1]), timeRecv]

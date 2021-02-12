@@ -63,10 +63,9 @@ class Ultra96Server:
         print(f"Received clock sync request from dancer, {dancerID}")
         timestamp = message
         print(f"t1 =",{timestamp})
-
-        response = str(timerecv) + "|" + str(time.time())
-
         conn, addr = self.dancerList[dancerID]
+
+        response = str(timerecv) + "|" + str(time.time())       
         conn.send(response.encode())
 
     # Must be called after acquiring offsetlock
@@ -104,8 +103,8 @@ class Ultra96Server:
             # print(conn,addr)
             while True:
                 data = json.loads(conn.recv(1024).decode("utf8"))
-                print("Received data:" + json.dumps(data))
                 timerecv = time.time()
+                print("Received data:" + json.dumps(data))
                 # print(data.decode("utf8"))
 
                 print(dancerID)
