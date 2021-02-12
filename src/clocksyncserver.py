@@ -102,8 +102,9 @@ class Ultra96Server:
             print(f"Handling: \n {conn} \n {addr}")
             # print(conn,addr)
             while True:
-                data = json.loads(conn.recv(1024).decode("utf8"))
+                data = conn.recv(1024)
                 timerecv = time.time()
+                data = json.loads(data.decode('utf8'))
                 print("Received data:" + json.dumps(data))
                 # print(data.decode("utf8"))
 
