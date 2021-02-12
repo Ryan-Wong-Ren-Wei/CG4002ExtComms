@@ -164,6 +164,6 @@ if __name__ == "__main__":
     executor.shutdown()
 
     print(f"offsets:", {str(ultra96Server.last10Offsets)})
-    print(f"Last set of timestamps:", {ultra96Server.currTimeStamps})
+    print(f"Last set of timestamps:", {str(ultra96Server.currTimeStamps)})
     for conn, addr in ultra96Server.dancerList:
         conn.close()

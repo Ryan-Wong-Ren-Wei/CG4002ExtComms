@@ -40,7 +40,7 @@ def sendTimeStamp(currSocket, timestamp: float):
     currSocket.send((json.dumps(messagedict)).encode())
     return
 
-def connectTo96(host,port):
+def run(host,port):
     key = 'Sixteen byte key'
     socketList = []
     for _ in range(3):
@@ -51,11 +51,12 @@ def connectTo96(host,port):
     command = input("type quit to quit -> ")
     while command != "quit":
         if command == "sync":
-            dancerID = 0
-            for currSocket in socketList:
-                for _ in range(10):
+            for _ in range(10):
+                dancerID = 0
+                for currSocket in socketList:
                     print(f"Clock syncing for dancer:",{dancerID})
                     startClockSync(currSocket)
+                    time.sleep(1)
                     dancerID += 1
         if command == "timestamp":
             dancerID = 0
@@ -83,7 +84,7 @@ def connectTo96(host,port):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "local":
-        connectTo96('127.0.0.1', 10022)
+        run('127.0.0.1', 10022)
 
     REMOTE_SERVER_IP = 'sunfire.comp.nus.edu.sg'
     PRIVATE_SERVER_IP = '137.132.86.228'
@@ -110,4 +111,4 @@ if __name__ == "__main__":
             print('Tunnel opened to ultra96 board with...')
             print('Address: ' + str(tunnel2.local_bind_address))
             print('Port no: ' + str(tunnel2.local_bind_port))  
-            connectTo96('localhost', tunnel2.local_bind_port)          
+            run('localhost', tunnel2.local_bind_port)          
