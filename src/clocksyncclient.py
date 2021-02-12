@@ -11,6 +11,8 @@ import json
 import socket
 from Util.encryption import EncryptionHandler
 
+SHUTDOWNCOMMAND={'command' : 'shutdown'}
+
 def startClockSync(currSocket):
     timeSend = time.time()
     messagedict = {"command" : "CS", "message" : str(timeSend)}
@@ -51,22 +53,28 @@ def connectTo96(host,port):
         if command == "sync":
             dancerID = 0
             for currSocket in socketList:
-                print(f"Clock syncing for dancer:",{dancerID})
-                startClockSync(currSocket)
-                dancerID += 1
+                for _ in range(10):
+                    print(f"Clock syncing for dancer:",{dancerID})
+                    startClockSync(currSocket)
+                    dancerID += 1
         if command == "timestamp":
             dancerID = 0
+            timestamps = []
+            
             for currSocket in socketList:
                 timestamp = time.time()
                 print("Spoofing timestamp for dancer " + str(dancerID) + ":" + str(timestamp))
                 sendTimeStamp(currSocket, timestamp)
                 time.sleep(0.2)
+                timestamps.append(timestamp)
+            
+            print("sync delay should be ->",{timestamps[2] - timestamps[0]})
         command = input("type quit to quit -> ")
 
     x = 0
     for currSocket in socketList:
         print("Shutting down dancer number " + str(x))
-        currSocket.send((json.dumps({'command' : 'shutdown'})).encode())
+        currSocket.send((json.dumps(SHUTDOWNCOMMAND)).encode())
         currSocket.close()
         x += 1
     print("Quitting now")

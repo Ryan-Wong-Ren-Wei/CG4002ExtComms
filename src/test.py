@@ -1,4 +1,4 @@
-
-while True:
-    number = int(input())
-    print(number % 10)
+booleans = [False,False,False]
+if booleans == [True for boolean in booleans]:
+    print("Yea")
+print(booleans)
