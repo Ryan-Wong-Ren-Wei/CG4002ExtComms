@@ -105,7 +105,8 @@ class Ultra96Server:
             while True:
                 data = conn.recv(1024)
                 timerecv = time.time()
-                data = json.loads(data.decode('utf8'))
+                data = self.encryptionhandler.decrypt_message(data)
+                data = json.loads(data)
                 print("Received data:" + json.dumps(data))
                 # print(data.decode("utf8"))
 

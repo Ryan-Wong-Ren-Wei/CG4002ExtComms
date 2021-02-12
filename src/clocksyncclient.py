@@ -12,12 +12,14 @@ import socket
 from Util.encryption import EncryptionHandler
 
 SHUTDOWNCOMMAND={'command' : 'shutdown'}
+encryptionHandler = EncryptionHandler(b"Sixteen byte key")
 
 def startClockSync(currSocket):
     timeSend = time.time()
     messagedict = {"command" : "CS", "message" : str(timeSend)}
     print(str(timeSend) + '|' + str(time.time()))
-    currSocket.send((json.dumps(messagedict)).encode("utf8"))
+    encrypted_msg = encryptionHandler.encrypt_msg(json.dumps(messagedict))
+    currSocket.send(encrypted_msg)
 
     response = currSocket.recv(1024)
     timeRecv = time.time()
@@ -35,13 +37,15 @@ def startClockSync(currSocket):
     # clockOffset = ((t[1] - t[0]) + (t[2] - t[3]))/2 
     clockOffset = ((t[2]-t[3]-roundTripTime/2) + (t[1] - t[0] - roundTripTime/2))/2
     messagedict = {"command" : "offset", "message" : str(clockOffset)}
-    currSocket.send((json.dumps(messagedict)).encode("utf8"))
+    encrypted_msg = encryptionHandler.encrypt_msg(json.dumps(messagedict))
+    currSocket.send(encrypted_msg)
     print("Clock offset:", {clockOffset})
     print("\n")
 
 def sendTimeStamp(currSocket, timestamp: float):
     messagedict = {"command" : "evaluateMove", "message" : str(timestamp)}
-    currSocket.send((json.dumps(messagedict)).encode())
+    encrypted_msg = encryptionHandler.encrypt_msg(json.dumps(messagedict))
+    currSocket.send(encrypted_msg)
     return
 
 def run(host,port):
@@ -57,13 +61,14 @@ def run(host,port):
     command = input("type quit to quit -> ")
     while command != "quit":
         if command == "sync":
+            timebetweensyncs = input("Enter time between each sync request: ")
             for _ in range(10):
                 dancerID = 0
                 for currSocket in socketList:
                     print(f"Clock syncing for dancer:",{dancerID})
                     startClockSync(currSocket)
                     dancerID += 1
-                    time.sleep(5)
+                    time.sleep(float(timebetweensyncs))
 
         if command == "timestamp":
             dancerID = 0
@@ -82,7 +87,8 @@ def run(host,port):
     x = 0
     for currSocket in socketList:
         print("Shutting down dancer number " + str(x))
-        currSocket.send((json.dumps(SHUTDOWNCOMMAND)).encode())
+        encrypted_msg = encryptionHandler.encrypt_msg(json.dumps(SHUTDOWNCOMMAND))
+        currSocket.send(encrypted_msg)
         currSocket.close()
         x += 1
     print("Quitting now")
