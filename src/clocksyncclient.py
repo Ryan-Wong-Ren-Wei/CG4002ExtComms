@@ -19,13 +19,15 @@ def startClockSync(currSocket):
     print(str(timeSend) + '|' + str(time.time()))
     currSocket.send((json.dumps(messagedict)).encode("utf8"))
 
-    response = currSocket.recv(1024).decode('utf8')
+    response = currSocket.recv(1024)
     timeRecv = time.time()
-    response = response.split("|")
+    response = response.decode('utf8')
+    print(response)
+    message = json.loads(response)['message'].split('|')
     
     print(f"t1:", {timeSend}, "t2:", \
-        {response[0]}, "t3:", {response[1]}, "t4:", {timeRecv})
-    t = [timeSend, float(response[0]), float(response[1]), timeRecv]
+        {message[0]}, "t3:", {message[1]}, "t4:", {timeRecv})
+    t = [timeSend, float(message[0]), float(message[1]), timeRecv]
     
     roundTripTime = (t[3] - t[0]) - (t[2] - t[1])
     print("RTT:", {roundTripTime})

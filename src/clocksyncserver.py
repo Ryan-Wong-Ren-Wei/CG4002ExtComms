@@ -66,7 +66,7 @@ class Ultra96Server:
         conn, addr = self.dancerList[dancerID]
 
         # response = str(timerecv) + "|" + str(time.time())
-        response = json.dumps({'command' : 'CS', 'message': str(time.time)})
+        response = json.dumps({'command' : 'CS', 'message': str(timerecv) + '|' + str(time.time())})
         conn.send(response.encode())
 
     # Must be called after acquiring offsetlock
