@@ -27,7 +27,7 @@ class Ultra96Server:
     currIndexClockOffset = [9,9,9]
 
     # Holds average offsets for 3 dancers, calculated from last10Offsets
-    currAvgOffsets = [None, None, None]
+    currAvgOffsets = [0.050481438636779785, 0.050481438636779785, 0.050481438636779785]
 
     # Booleans to check if current moves have been received for each dancer
     currentMoveReceived = [False,False,False] 
