@@ -56,7 +56,7 @@ def run(host,port):
                 for currSocket in socketList:
                     print(f"Clock syncing for dancer:",{dancerID})
                     startClockSync(currSocket)
-                    time.sleep(1)
+                    time.sleep(5)
                     dancerID += 1
         if command == "timestamp":
             dancerID = 0

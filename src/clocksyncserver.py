@@ -7,8 +7,8 @@ import time
 from Util.encryption import EncryptionHandler
 
 class Ultra96Server:
-     # Set containing "host" and "port" values for ultra96 server
-    connection = {}
+     # Tuple containing "host" and "port" values for ultra96 server
+    connection = ()
 
     # Holds socket address and port for each dancer
     dancerList = None
@@ -37,8 +37,8 @@ class Ultra96Server:
     moveRcvLock = threading.Lock()
 
     # Initialize encryption handler and socket data + misc setup
-    def __init__(self, host, port, key):
-        self.connection = {host,port}
+    def __init__(self, host:str, port:int, key:bytes):
+        self.connection = (host,port)
         self.encryptionhandler = EncryptionHandler(key.encode())
 
         for _ in range(10):
@@ -134,8 +134,8 @@ class Ultra96Server:
     def initializeConnections(self, numDancers = 3):
         tempDancerList = [] 
         mySocket = socket.socket()
-        host,port = self.connection
-        mySocket.bind((host,port))
+        # host,port = self.connection
+        mySocket.bind((self.connection))
         mySocket.listen(5)
 
         try:
