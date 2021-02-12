@@ -51,6 +51,8 @@ def run(host,port):
         mySocket.connect((host,port))   
         socketList.append(mySocket)
 
+    print(socketList)
+
     command = input("type quit to quit -> ")
     while command != "quit":
         if command == "sync":
@@ -59,7 +61,6 @@ def run(host,port):
                 for currSocket in socketList:
                     print(f"Clock syncing for dancer:",{dancerID})
                     startClockSync(currSocket)
-                    time.sleep(5)
                     dancerID += 1
 
         if command == "timestamp":
