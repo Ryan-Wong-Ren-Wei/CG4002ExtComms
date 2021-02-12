@@ -16,6 +16,7 @@ SHUTDOWNCOMMAND={'command' : 'shutdown'}
 def startClockSync(currSocket):
     timeSend = time.time()
     messagedict = {"command" : "CS", "message" : str(timeSend)}
+    print(str(timeSend) + '|' + str(time.time()))
     currSocket.send((json.dumps(messagedict)).encode("utf8"))
 
     response = currSocket.recv(1024).decode('utf8')
@@ -58,6 +59,7 @@ def run(host,port):
                     startClockSync(currSocket)
                     time.sleep(5)
                     dancerID += 1
+
         if command == "timestamp":
             dancerID = 0
             timestamps = []
