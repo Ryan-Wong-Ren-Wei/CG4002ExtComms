@@ -1,6 +1,7 @@
 # local test files
 ignore.*.*
 env
+src/evaluation_logs
 .vscode
 __pycache__
 
