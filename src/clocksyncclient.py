@@ -32,7 +32,8 @@ def startClockSync(currSocket):
     roundTripTime = (t[3] - t[0]) - (t[2] - t[1])
     print("RTT:", {roundTripTime})
     
-    clockOffset = ((t[1] - t[0]) + (t[2] - t[3]))/2 
+    # clockOffset = ((t[1] - t[0]) + (t[2] - t[3]))/2 
+    clockOffset = ((t[2]-t[3]-roundTripTime/2) + (t[1] - t[0] - roundTripTime/2))/2
     messagedict = {"command" : "offset", "message" : str(clockOffset)}
     currSocket.send((json.dumps(messagedict)).encode("utf8"))
     print("Clock offset:", {clockOffset})
@@ -62,6 +63,7 @@ def run(host,port):
                     print(f"Clock syncing for dancer:",{dancerID})
                     startClockSync(currSocket)
                     dancerID += 1
+                    time.sleep(5)
 
         if command == "timestamp":
             dancerID = 0
