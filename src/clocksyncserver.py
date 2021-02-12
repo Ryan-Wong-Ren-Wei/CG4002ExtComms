@@ -81,13 +81,13 @@ class Ultra96Server:
         return avgOffsets
             
     def updateOffset(self, message: str, dancerID: int):
-        self.offsetLock.acquire()
+        # self.offsetLock.acquire()
         print(f"{dancerID} has received offsetlock")
         self.last10Offsets[self.currIndexClockOffset[dancerID - 1]][dancerID - 1] = float(message)
         self.currIndexClockOffset[dancerID - 1] = (self.currIndexClockOffset[dancerID - 1] - 1) % 10
         self.updateAvgOffsets()
         print(f"{dancerID} is releasing offsetlock")
-        self.offsetLock.release()
+        # self.offsetLock.release()
 
         print("Updating dancer " + str(dancerID) + " offset to: " + message)
         return
