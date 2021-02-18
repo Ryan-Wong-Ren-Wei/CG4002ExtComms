@@ -125,7 +125,7 @@ class Ultra96Server:
                     self.currentMoveReceived[dancerID] = True
                     if self.currentMoveReceived == [True for boolean in self.currentMoveReceived]:
                         print(f"Sync delay calculated:", {self.calculateSyncDelay()})
-                    self.currentMoveReceived = [False,False,False]
+                        self.currentMoveReceived = [False,False,False]
                     self.moveRcvLock.release()
 
                 # decrypted_msg = encryptionHandler.decrypt_message(data)
