@@ -59,6 +59,12 @@ class Ultra96Server:
 
         return
 
+    def broadcastMessage(self, message):
+        message = self.encryptionhandler.encrypt_msg(message)
+        for conn, addr in self.clients.values():
+            print("BROADCAST: ",conn)
+            conn.send(message)
+
     def respondClockSync(self, message : str, dancerID : int, timerecv):
         print(f"Received clock sync request from dancer, {dancerID}")
         timestamp = message
@@ -72,7 +78,6 @@ class Ultra96Server:
     # Must be called after acquiring offsetlock
     def updateAvgOffset(self):
         for dancerID, offsetList in self.last10Offsets.items():
-            print("OFFSETLIST", offsetList)
             currSum = 0
             numOffsets = 10
             for offset in offsetList:
@@ -101,11 +106,24 @@ class Ultra96Server:
         sortedTimestamps = sorted(self.currTimeStamps.values())
         return (sortedTimestamps[2] - sortedTimestamps[0])
 
+    def handleServerInput(self):
+        command = input("The rest of this test script will be controlled via " +
+            "server side input. Type 'sync' to perform clock synchronization " +
+            "protocol and 'start' to broadcast start signal to all laptops/dancers\n")
+
+
+        while command != "quit":
+            if command == "sync":
+                self.broadcastMessage("sync")
+            if command == "start":
+                self.broadcastMessage("start")
+            command = input("Enter 'sync' to start clock sync and 'start' "+
+                "to send start signal for move eval")
+        self.broadcastMessage("quit")
+
     def handleClient(self, dancerID : str):
         conn,addr = self.clients[dancerID]
         try:
-            print(f"Handling: \n {conn} \n {addr}")
-            # print(conn,addr)
             while True:
                 data = conn.recv(1024)
                 timerecv = time.time()
@@ -150,12 +168,12 @@ class Ultra96Server:
                 data = self.encryptionhandler.decrypt_message(conn.recv(4096))
                 print("Dancer ID: ", data)
                 self.clients[data] = (conn,addr)
+                print(addr, '\n')
 
                 self.currIndexClockOffset[data] = 9 # initialize index counter to 9 for each dancer
                 self.last10Offsets[data] = [None for _ in range(10)] # initialize last 10 offsets for dancer id to None
                 self.currAvgOffsets[data] = None
                 self.currentMoveReceived[data] = False
-
             return 
         except:
             print(sys.exc_info()[0], "\n")
@@ -165,14 +183,17 @@ if __name__ == "__main__":
     ultra96Server = Ultra96Server(host='127.0.0.1',port=10022,key="Sixteen byte key")
     ultra96Server.initializeConnections()
 
-    print("DANCER LIST: " + str(ultra96Server.clients))
+    # print("DANCER LIST: " + str(ultra96Server.clients))
 
     dancerIDlist = []
     for key in ultra96Server.clients:
         dancerIDlist.append(key)
     executor = concurrent.futures.ThreadPoolExecutor()
-    for result in executor.map(ultra96Server.handleClient, dancerIDlist):
-        print("result of thread: " + str(result), "\n")
+    # print(dancerIDlist)
+    
+    for dancer in dancerIDlist:
+        executor.submit(ultra96Server.handleClient, dancer)
+    executor.submit(ultra96Server.handleServerInput)
 
     executor.shutdown()
     print(f"offsets:", {str(ultra96Server.last10Offsets)})
