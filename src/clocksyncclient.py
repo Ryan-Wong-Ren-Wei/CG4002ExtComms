@@ -51,9 +51,10 @@ def sendTimeStamp(currSocket, timestamp: float):
 def run(host,port):
     key = 'Sixteen byte key'
     socketList = []
-    for _ in range(3):
+    for x in range(3):
         mySocket =  socket.socket()
-        mySocket.connect((host,port))   
+        mySocket.connect((host,port))  
+        mySocket.send(encryptionHandler.encrypt_msg(str(x))) 
         socketList.append(mySocket)
 
     print(socketList)

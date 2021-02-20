@@ -10,27 +10,27 @@ class Ultra96Server:
      # Tuple containing "host" and "port" values for ultra96 server
     connection = ()
 
-    # Holds socket address and port for each dancer
-    dancerList = None
+    # Holds socket address and port for each dancer, tied to dancer id as key
+    clients = {}
 
     # Class for handling AES encryption
     encryptionhandler = None 
 
     # Holds last timestamps from the 3 dancers/laptops
-    currTimeStamps = [0,0,0] 
+    currTimeStamps = {}
 
     # Holds the last 10 recorded offsets from the 3 dancers
     # 2d array containing 10 lists of 3 offsets from each dancer 
-    last10Offsets = [] 
+    last10Offsets = {}
 
     # Used to iterate offset list from the back in order to update offsets
-    currIndexClockOffset = [9,9,9]
+    currIndexClockOffset = {}
 
     # Holds average offsets for 3 dancers, calculated from last10Offsets
-    currAvgOffsets = [None, None, None]
+    currAvgOffsets = {}
 
     # Booleans to check if current moves have been received for each dancer
-    currentMoveReceived = [False,False,False] 
+    currentMoveReceived = {}
 
     offsetLock = threading.Lock()
     timestampLock = threading.Lock()
@@ -41,8 +41,8 @@ class Ultra96Server:
         self.connection = (host,port)
         self.encryptionhandler = EncryptionHandler(key.encode())
 
-        for _ in range(10):
-            self.last10Offsets.append([None,None,None])
+        # for _ in range(10):
+        #     self.last10Offsets.append([None,None,None])
         return
 
     def updateTimeStamp(self, message : str, dancerID : int):
@@ -51,10 +51,10 @@ class Ultra96Server:
 
         #calculate relative time using offset
         timestamp = float(message)
-        relativeTS = timestamp - self.currAvgOffsets[dancerID - 1]
+        relativeTS = timestamp - self.currAvgOffsets[dancerID]
 
         self.timestampLock.acquire()
-        self.currTimeStamps[dancerID - 1] = relativeTS
+        self.currTimeStamps[dancerID] = relativeTS
         self.timestampLock.release()
 
         return
@@ -63,30 +63,34 @@ class Ultra96Server:
         print(f"Received clock sync request from dancer, {dancerID}")
         timestamp = message
         print(f"t1 =",{timestamp})
-        conn, addr = self.dancerList[dancerID]
+        conn, addr = self.clients[dancerID]
 
         # response = str(timerecv) + "|" + str(time.time())
         response = json.dumps({'command' : 'CS', 'message': str(timerecv) + '|' + str(time.time())})
         conn.send(response.encode())
 
     # Must be called after acquiring offsetlock
-    def updateAvgOffsets(self):
-        avgOffsets = [0,0,0]
-        for offsets in self.last10Offsets:
-            if offsets[0] is None or offsets[1] is None or offsets[2] is None:
+    def updateAvgOffset(self):
+        for dancerID, offsetList in self.last10Offsets.items():
+            print("OFFSETLIST", offsetList)
+            currSum = 0
+            numOffsets = 10
+            for offset in offsetList:
+                if offset is None:
+                    numOffsets -= 1
+                    continue
+                currSum += offset
+            if numOffsets == 0:
                 continue
-            for currID in range(len(offsets)):
-                avgOffsets[currID] += offsets[currID]
+            self.currAvgOffsets[dancerID] = currSum/numOffsets
         
-        self.currAvgOffsets = avgOffsets
-        return avgOffsets
             
     def updateOffset(self, message: str, dancerID: int):
         self.offsetLock.acquire()
         print(f"{dancerID} has received offsetlock")
-        self.last10Offsets[self.currIndexClockOffset[dancerID - 1]][dancerID - 1] = float(message)
-        self.currIndexClockOffset[dancerID - 1] = (self.currIndexClockOffset[dancerID - 1] - 1) % 10
-        self.updateAvgOffsets()
+        self.last10Offsets[dancerID][self.currIndexClockOffset[dancerID]] = float(message)
+        self.currIndexClockOffset[dancerID] = (self.currIndexClockOffset[dancerID] - 1) % 10
+        self.updateAvgOffset()
         print(f"{dancerID} is releasing offsetlock")
         self.offsetLock.release()
 
@@ -94,11 +98,11 @@ class Ultra96Server:
         return
     
     def calculateSyncDelay(self):
-        sortedTimestamps = sorted(self.currTimeStamps)
+        sortedTimestamps = sorted(self.currTimeStamps.values())
         return (sortedTimestamps[2] - sortedTimestamps[0])
 
-    def handleClient(self, dancerID):
-        conn,addr = self.dancerList[dancerID]
+    def handleClient(self, dancerID : str):
+        conn,addr = self.clients[dancerID]
         try:
             print(f"Handling: \n {conn} \n {addr}")
             # print(conn,addr)
@@ -110,9 +114,8 @@ class Ultra96Server:
                 print("Received data:" + json.dumps(data))
                 # print(data.decode("utf8"))
 
-                print(dancerID)
                 if data['command'] == "shutdown":
-                    print('Received shutdown signal')
+                    print(dancerID, ' Received shutdown signal\n')
                     break
                 elif data['command'] == "CS":
                     self.respondClockSync(data['message'], dancerID, timerecv)
@@ -123,19 +126,19 @@ class Ultra96Server:
 
                     self.moveRcvLock.acquire()
                     self.currentMoveReceived[dancerID] = True
-                    if self.currentMoveReceived == [True for boolean in self.currentMoveReceived]:
+                    print(self.currentMoveReceived.values())
+                    if all(value == True for value in self.currentMoveReceived.values()):
                         print(f"Sync delay calculated:", {self.calculateSyncDelay()})
-                        self.currentMoveReceived = [False,False,False]
+                        self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
                     self.moveRcvLock.release()
 
                 # decrypted_msg = encryptionHandler.decrypt_message(data)
-            print("RETURNING")
+            print(dancerID, " RETURNING\n")
         except:
-            print(sys.exc_info())
+            print("[ERROR][", dancerID, "] -> ", sys.exc_info())
 
     # Initialize connections with 3 dancers prior to start of evaluation
     def initializeConnections(self, numDancers = 3):
-        tempDancerList = [] 
         mySocket = socket.socket()
         # host,port = self.connection
         mySocket.bind((self.connection))
@@ -144,29 +147,33 @@ class Ultra96Server:
         try:
             for _ in range(numDancers):
                 conn,addr = mySocket.accept()
-                tempDancerList.append((conn, addr))
+                data = self.encryptionhandler.decrypt_message(conn.recv(4096))
+                print("Dancer ID: ", data)
+                self.clients[data] = (conn,addr)
 
-            self.dancerList = tempDancerList
+                self.currIndexClockOffset[data] = 9 # initialize index counter to 9 for each dancer
+                self.last10Offsets[data] = [None for _ in range(10)] # initialize last 10 offsets for dancer id to None
+                self.currAvgOffsets[data] = None
+                self.currentMoveReceived[data] = False
+
             return 
         except:
-            print(sys.exc_info()[0])
+            print(sys.exc_info()[0], "\n")
             return
-            # for conn, addr in tempDancerList:
-            #     conn.close()
 
 if __name__ == "__main__":
     ultra96Server = Ultra96Server(host='127.0.0.1',port=10022,key="Sixteen byte key")
     ultra96Server.initializeConnections()
 
+    print("DANCER LIST: " + str(ultra96Server.clients))
+
+    dancerIDlist = []
+    for key in ultra96Server.clients:
+        dancerIDlist.append(key)
     executor = concurrent.futures.ThreadPoolExecutor()
-
-
-    for dancerID in range(len(ultra96Server.dancerList)):
-        executor.submit(ultra96Server.handleClient, dancerID)
+    for result in executor.map(ultra96Server.handleClient, dancerIDlist):
+        print("result of thread: " + str(result), "\n")
 
     executor.shutdown()
-
     print(f"offsets:", {str(ultra96Server.last10Offsets)})
     print(f"Last set of timestamps:", {str(ultra96Server.currTimeStamps)})
-    for conn, addr in ultra96Server.dancerList:
-        conn.close()
