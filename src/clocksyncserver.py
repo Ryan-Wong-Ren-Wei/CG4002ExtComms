@@ -144,7 +144,6 @@ class Ultra96Server:
 
                     self.moveRcvLock.acquire()
                     self.currentMoveReceived[dancerID] = True
-                    print(self.currentMoveReceived.values())
                     if all(value == True for value in self.currentMoveReceived.values()):
                         print(f"Sync delay calculated:", {self.calculateSyncDelay()})
                         self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
