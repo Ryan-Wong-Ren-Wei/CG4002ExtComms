@@ -107,7 +107,6 @@ class Ultra96Server:
             print("Offset variance too high: ",varLast10, "Resyncing for Dancer: ", dancerID)
             conn,addr = self.clients[dancerID]
             conn.send(self.encryptionhandler.encrypt_msg("sync"))
-            self.clocksyncCount[dancerID] = 0
         return
             
     def updateOffset(self, message: str, dancerID):
@@ -124,6 +123,7 @@ class Ultra96Server:
 
         if self.clocksyncCount[dancerID] == 10:
             self.checkOffsetVar(dancerID)
+            self.clocksyncCount[dancerID] = 0
             
         print("Updating dancer " + str(dancerID) + " offset to: " + message + "\n")
         return

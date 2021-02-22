@@ -57,8 +57,9 @@ def run(host,port,dancerID):
     command = encryptionHandler.decrypt_message(mySocket.recv(1024))
     while command != "quit":
         if command == "sync":
+            print(f"Clock syncing for dancer:",{dancerID})
             for _ in range(10):
-                print(f"Clock syncing for dancer:",{dancerID})
+                
                 startClockSync(mySocket)
                 time.sleep(0.2)
             print("Sync complete for 10 rotations")
