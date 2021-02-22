@@ -6,6 +6,11 @@ import concurrent.futures
 import time
 from Util.encryption import EncryptionHandler
 
+def variance(data, ddof=0):
+    n = len(data)
+    mean = sum(data) / n 
+    return sum((x - mean) ** 2 for x in data) / (n - ddof)
+
 class Ultra96Server:
      # Tuple containing "host" and "port" values for ultra96 server
     connection = ()
@@ -32,6 +37,10 @@ class Ultra96Server:
     # Booleans to check if current moves have been received for each dancer
     currentMoveReceived = {}
 
+    # Count to keep track of number of clock sync updates sent from each client
+    # in current rotation (1-10)
+    clocksyncCount = {}
+
     offsetLock = threading.Lock()
     timestampLock = threading.Lock()
     moveRcvLock = threading.Lock()
@@ -45,7 +54,7 @@ class Ultra96Server:
         #     self.last10Offsets.append([None,None,None])
         return
 
-    def updateTimeStamp(self, message : str, dancerID : int):
+    def updateTimeStamp(self, message : str, dancerID):
         print("Evaluating move...")
         print(f"time recorded by bluno:", {message})
 
@@ -65,7 +74,7 @@ class Ultra96Server:
             print("BROADCAST: ",conn)
             conn.send(message)
 
-    def respondClockSync(self, message : str, dancerID : int, timerecv):
+    def respondClockSync(self, message : str, dancerID, timerecv):
         print(f"Received clock sync request from dancer, {dancerID}")
         timestamp = message
         print(f"t1 =",{timestamp})
@@ -89,8 +98,19 @@ class Ultra96Server:
                 continue
             self.currAvgOffsets[dancerID] = currSum/numOffsets
         
+    # Check if variance between 10 offsets in dancerID is too high.
+    # If so, force another 10 updates with the specific dancerID
+    def checkOffsetVar(self, dancerID):
+        varLast10 = variance(self.last10Offsets[dancerID])
+        print("VARIANCE FOR DANCER: ", dancerID, varLast10)
+        if varLast10 > 1e-05:
+            print("Offset variance too high: ",varLast10, "Resyncing for Dancer: ", dancerID)
+            conn,addr = self.clients[dancerID]
+            conn.send(self.encryptionhandler.encrypt_msg("sync"))
+            self.clocksyncCount[dancerID] = 0
+        return
             
-    def updateOffset(self, message: str, dancerID: int):
+    def updateOffset(self, message: str, dancerID):
         self.offsetLock.acquire()
         print(f"{dancerID} has received offsetlock")
         self.last10Offsets[dancerID][self.currIndexClockOffset[dancerID]] = float(message)
@@ -99,7 +119,13 @@ class Ultra96Server:
         print(f"{dancerID} is releasing offsetlock")
         self.offsetLock.release()
 
-        print("Updating dancer " + str(dancerID) + " offset to: " + message)
+        if self.clocksyncCount[dancerID] != 10:
+            self.clocksyncCount[dancerID] += 1
+
+        if self.clocksyncCount[dancerID] == 10:
+            self.checkOffsetVar(dancerID)
+            
+        print("Updating dancer " + str(dancerID) + " offset to: " + message + "\n")
         return
     
     def calculateSyncDelay(self):
@@ -129,7 +155,7 @@ class Ultra96Server:
                 timerecv = time.time()
                 data = self.encryptionhandler.decrypt_message(data)
                 data = json.loads(data)
-                print("Received data:" + json.dumps(data))
+                print("Received data:" + json.dumps(data) + "\n")
                 # print(data.decode("utf8"))
 
                 if data['command'] == "shutdown":
@@ -173,6 +199,7 @@ class Ultra96Server:
                 self.last10Offsets[data] = [None for _ in range(10)] # initialize last 10 offsets for dancer id to None
                 self.currAvgOffsets[data] = None
                 self.currentMoveReceived[data] = False
+                self.clocksyncCount[data] = 0
             return 
         except:
             print(sys.exc_info()[0], "\n")
