@@ -106,6 +106,7 @@ class Ultra96Server:
         self.updateAvgOffset()
 
         clockDriftDetected = False
+        offsetDiff = 0
         if not prevOffset is None:
             offsetDiff = abs(self.currAvgOffsets[dancerID] - prevOffset)
             clockDriftDetected = (offsetDiff > 5e-05)
