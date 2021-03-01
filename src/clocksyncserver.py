@@ -101,12 +101,22 @@ class Ultra96Server:
     # Check if variance between 10 offsets in dancerID is too high.
     # If so, force another 10 updates with the specific dancerID
     def checkOffsetVar(self, dancerID):
+        conn,addr = self.clients[dancerID]
+        prevOffset = self.currAvgOffsets[dancerID]
+        self.updateAvgOffset()
+
+        clockDriftDetected = False
+        if not prevOffset is None:
+            offsetDiff = abs(self.currAvgOffsets[dancerID] - prevOffset)
+            clockDriftDetected = (offsetDiff > 0)
+
         varLast10 = variance(self.last10Offsets[dancerID])
         print("VARIANCE FOR DANCER: ", dancerID, varLast10)
-        if varLast10 > 1e-05:
-            print("Offset variance too high: ",varLast10, "Resyncing for Dancer: ", dancerID)
-            conn,addr = self.clients[dancerID]
+        if varLast10 > 1e-05 or clockDriftDetected:
+            print("Offset variance too high: ",varLast10," or clock drift too high:",
+                offsetDiff, "Resyncing for Dancer: ", dancerID)
             conn.send(self.encryptionhandler.encrypt_msg("sync"))
+        
         return
             
     def updateOffset(self, message: str, dancerID):
@@ -114,7 +124,6 @@ class Ultra96Server:
         print(f"{dancerID} has received offsetlock")
         self.last10Offsets[dancerID][self.currIndexClockOffset[dancerID]] = float(message)
         self.currIndexClockOffset[dancerID] = (self.currIndexClockOffset[dancerID] - 1) % 10
-        self.updateAvgOffset()
         print(f"{dancerID} is releasing offsetlock")
         self.offsetLock.release()
 
