@@ -1,8 +1,0 @@
-update dancer id to be sent from client side, used as id for all dicts to store info on server side
-
-encrypt all messages
-
-clock sync start from server side, with signal to start clock sync
-store offset in clientside, calculate relative timestamp before sending to server
-
-move evaluation does not start until server sends start signal to all clients
