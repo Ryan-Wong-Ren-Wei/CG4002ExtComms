@@ -108,7 +108,7 @@ class Ultra96Server:
         clockDriftDetected = False
         if not prevOffset is None:
             offsetDiff = abs(self.currAvgOffsets[dancerID] - prevOffset)
-            clockDriftDetected = (offsetDiff > 0)
+            clockDriftDetected = (offsetDiff > 5e-05)
 
         varLast10 = variance(self.last10Offsets[dancerID])
         print("VARIANCE FOR DANCER: ", dancerID, varLast10)
