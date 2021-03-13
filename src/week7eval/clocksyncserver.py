@@ -12,7 +12,7 @@ def variance(data, ddof=0):
     return sum((x - mean) ** 2 for x in data) / (n - ddof)
 
 class Ultra96Server:
-     # Tuple containing "host" and "port" values for ultra96 server
+    # Tuple containing "host" and "port" values for ultra96 server
     connection = ()
 
     # Holds socket address and port for each dancer, tied to dancer id as key

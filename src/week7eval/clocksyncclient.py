@@ -17,7 +17,7 @@ offset = None
 
 def startClockSync(currSocket):
     timeSend = time.time()
-    messagedict = {"command" : "CS", "message" : str(timeSend)}
+    messagedict = {"command" : "clocksync", "message" : str(timeSend)}
     print(str(timeSend) + '|' + str(time.time()))
     encrypted_msg = encryptionHandler.encrypt_msg(json.dumps(messagedict))
     currSocket.send(encrypted_msg)
@@ -52,9 +52,13 @@ def run(host,port,dancerID):
     mySocket = socket.socket()
     mySocket.connect((host,port))
     print("Connection established with ", (host,port))
-    mySocket.send(encryptionHandler.encrypt_msg(dancerID)) 
-
-    command = encryptionHandler.decrypt_message(mySocket.recv(1024))
+    # print(dancerID)
+    msg = encryptionHandler.encrypt_msg(dancerID)
+    print(encryptionHandler.decrypt_message(msg))
+    mySocket.send(msg) 
+    data = mySocket.recv(1024)
+    print(data)
+    command = encryptionHandler.decrypt_message(data)
     while command != "quit":
         if command == "sync":
             print(f"Clock syncing for dancer:",{dancerID})
