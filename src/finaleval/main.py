@@ -4,11 +4,19 @@ import threading
 from server import Ultra96Server
 import concurrent.futures
 import threading
+from evalClient import EvalClient
 
 class ControlMain():
     def __init__(self):
-        self.ultra96Server = Ultra96Server(host='127.0.0.1', port=10022, key="Sixteen byte key")
+        self.lockDataQueue = threading.Lock()
 
+        #if true, then broadcast clock sync. If false, wait for move eval then set to true
+        self.doClockSync = threading.Event()
+        self.doClockSync.set()
+
+        self.ultra96Server = Ultra96Server(host='127.0.0.1', port=10022, key="Sixteen byte key", controlMain=self)
+        self.evalClient = EvalClient('127.0.0.1', 10023, controlMain=self)
+        
     def run(self):
         dancerIDList = []
         self.ultra96Server.initializeConnections()
@@ -18,10 +26,15 @@ class ControlMain():
         print(dancerIDList)
         
         for dancer in dancerIDList:
-            print("HI")
             executor.submit(self.ultra96Server.handleClient, dancer)
+        # executor.submit(self.ultra96Server.handleClockSync)
 
         self.ultra96Server.broadcastMessage('sync')
+
+        input("Press Enter to connect to eval server")
+
+        self.evalClient.connectToEval()
+        # Start ML thingy here
 
         executor.shutdown()
 

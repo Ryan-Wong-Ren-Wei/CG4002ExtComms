@@ -43,9 +43,12 @@ class Ultra96Server():
     # in current rotation (1-10)
     clocksyncCount = {}
 
-    def __init__(self, host:str, port:int, key:str):
+    def __init__(self, host:str, port:int, key:str, controlMain):
+        self.controlMain = controlMain
         self.connection = (host,port)
         self.encryptionHandler = EncryptionHandler(key.encode())
+        self.lockDataQueue = controlMain.lockDataQueue
+        self.doClockSync = controlMain.doClockSync
         return
 
     def initializeConnections(self, numDancers = NUM_DANCERS):
@@ -109,6 +112,12 @@ class Ultra96Server():
             print(dancerID, " RETURNING\n")
         except:
             print("[ERROR][", dancerID, "] -> ", sys.exc_info())
+
+    def handleClockSync(self):
+        while True:
+            self.doClockSync.wait()
+            self.broadcastMessage('sync')
+            self.doClockSync.clear()
 
     # Check if variance between 10 offsets in dancerID is too high.
     # If so, force another 10 updates with the specific dancerID

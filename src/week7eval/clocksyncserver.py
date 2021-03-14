@@ -191,7 +191,7 @@ class Ultra96Server:
             print("[ERROR][", dancerID, "] -> ", sys.exc_info())
 
     # Initialize connections with 3 dancers prior to start of evaluation
-    def initializeConnections(self, numDancers = 3):
+    def initializeConnections(self, numDancers = 1):
         mySocket = socket.socket()
         # host,port = self.connection
         mySocket.bind((self.connection))
