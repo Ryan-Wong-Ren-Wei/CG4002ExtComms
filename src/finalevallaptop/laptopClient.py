@@ -1,6 +1,6 @@
 import time 
 import sys
-from multiprocessing import Event
+from multiprocessing import Event, Lock
 import getpass
 from sshtunnel import SSHTunnelForwarder
 from Cryptodome.Cipher import AES
@@ -18,6 +18,7 @@ class LaptopClient():
     def __init__(self, host, port, dancerID):
         self.moveStarted = Event()
         self.evalStarted = Event()
+        self.socketLock = Lock()
         self.host = host
         self.port = port
         self.encryptionHandler = EncryptionHandler(b'Sixteen byte key')
@@ -35,8 +36,8 @@ class LaptopClient():
                 packet = inputQueue.get()
                 if packet is not None:
                     if not self.evalStarted.is_set():
-                        print("Eval not yet started, ignoring data")
-                        print(packet)
+                        # print("Eval not yet started, ignoring data")
+                        # print(packet)
                         continue
                     if packet['moveFlag'] == 1:
                         if not self.moveStarted.is_set():
@@ -45,31 +46,27 @@ class LaptopClient():
                             self.sendMessage(json.dumps({"command" : "timestamp", "message" : time.time()}))
                         packet['command'] = 'data'
                         self.sendMessage(json.dumps(packet))
-                        print(packet)
+                        # print(packet)
                     else:
                         self.moveStarted.clear()
                 else:
                     print("No packet found...")
         except:
             print("HANDLEBLUNO", sys.exc_info)
-#            time.sleep(0.1)
+            time.sleep(0.1)
 
     def startClockSync(self):
-        timeSend = time.time()
-        messagedict = {"command" : "clocksync", "message" : str(timeSend)}
-        print(str(timeSend) + '|' + str(time.time()))
+        self.timeSend = time.time()
+        messagedict = {"command" : "clocksync", "message" : str(self.timeSend)}
+        print("SENDING", messagedict)
         encrypted_msg = self.encryptionHandler.encrypt_msg(json.dumps(messagedict))
         self.mySocket.send(encrypted_msg)
 
-        response = self.mySocket.recv(1024)
-        timeRecv = time.time()
-        response = response.decode('utf8')
-        print(response)
-        message = json.loads(response)['message'].split('|')
-        
-        print(f"t1:", {timeSend}, "t2:", \
-            {message[0]}, "t3:", {message[1]}, "t4:", {timeRecv})
-        t = [timeSend, float(message[0]), float(message[1]), timeRecv]
+    def respondClockSync(self, timestamps, timeRecv):
+        timestamps = json.loads(timestamps)['message'].split('|')
+        print(f"t1:", {self.timeSend}, "t2:", \
+            {timestamps[0]}, "t3:", {timestamps[1]}, "t4:", {timeRecv})
+        t = [self.timeSend, float(timestamps[0]), float(timestamps[1]), timeRecv]
         
         roundTripTime = (t[3] - t[0]) - (t[2] - t[1])
         print("RTT:", {roundTripTime})
@@ -80,17 +77,24 @@ class LaptopClient():
         self.mySocket.send(encrypted_msg)
         print("Clock offset:", {clockOffset})
         print("\n")
-
-    def handleServerCommands(self):
+        
+    def handleServerCommands(self): 
         command = self.mySocket.recv(4096)
+        timeRecv = time.time()
         command = self.encryptionHandler.decrypt_message(command)
+        print("COMMAND RECEIVED:", command)
         while command != "quit":
             if command == "sync":
                 self.startClockSync()
             elif command == "start":
-                self.evalStarted.set()  
+                self.evalStarted.set() 
+            elif "clocksync" in command:
+                self.respondClockSync(command,timeRecv)
+
             command = self.mySocket.recv(4096)
+            timeRecv = time.time()
             command = self.encryptionHandler.decrypt_message(command)
+            print("COMMAND RECEIVED:", command)
         print("Shutting down dancer number " + self.dancerID)
         encrypted_msg = self.encryptionHandler.encrypt_msg(json.dumps(SHUTDOWNCOMMAND))
         self.mySocket.send(encrypted_msg)

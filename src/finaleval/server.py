@@ -1,4 +1,4 @@
-from queue import Queue
+from multiprocessing import Queue
 import socket
 import sys
 import json
@@ -83,17 +83,26 @@ class Ultra96Server():
 
     def calculateSyncDelay(self):
         sortedTimestamps = sorted(self.currTimeStamps.values())
-        return (sortedTimestamps[2] - sortedTimestamps[0])
+        return (sortedTimestamps[-1] - sortedTimestamps[0])
 
     def addData(self, dancerID, data):
         with self.lockDataQueue:
             self.dancerDataDict[dancerID].put(data)
 
+    def updateTimeStamp(self, message : str, dancerID):
+        print("Evaluating move...")
+        print(f"time recorded by bluno:", {message})
+
+        #calculate relative time using offset
+        timestamp = float(message)
+        relativeTS = timestamp - self.currAvgOffsets[dancerID]
+        self.currTimeStamps[dancerID] = relativeTS
+
     def handleClient(self, dancerID : str):
         conn,addr = self.clients[dancerID]
         try:
             while True:
-                data = conn.recv(1024)
+                data = conn.recv(4096)
                 timerecv = time.time()
                 data = self.encryptionHandler.decrypt_message(data)
                 data = json.loads(data)
@@ -107,13 +116,14 @@ class Ultra96Server():
                     self.respondClockSync(data['message'], dancerID, timerecv)
                 elif data['command'] == "offset":
                     self.updateOffset(data['message'], dancerID)
-                # elif data['command'] == "timestamp":
-                #     self.updateTimeStamp(data['message'], dancerID)
-
-                #     self.currentMoveReceived[dancerID] = True
-                #     if all(value == True for value in self.currentMoveReceived.values()):
-                #         print(f"Sync delay calculated:", {self.calculateSyncDelay()})
-                #         self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
+                elif data['command'] == "timestamp":
+                    self.updateTimeStamp(data['message'], dancerID)
+                    print("LINE 121")
+                    self.currentMoveReceived[dancerID] = True
+                    # if all(value == True for value in self.currentMoveReceived.values()):
+                    #     print(f"Sync delay calculated:", {self.calculateSyncDelay()})
+                    #     self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
+                    print("LINE 126")
                 elif data['command'] == "data":
                     data.pop('command')
                     self.addData(dancerID, data)
@@ -122,6 +132,8 @@ class Ultra96Server():
             print(dancerID, " RETURNING\n")
         except:
             print("[ERROR][", dancerID, "] -> ", sys.exc_info())
+            print(self.dancerDataDict[dancerID].qsize())
+            sys.exit()
 
     def handleClockSync(self):
         while True:
@@ -178,9 +190,9 @@ class Ultra96Server():
         return
 
     def broadcastMessage(self, message):
+        print("BROADCASTING: ", message)
         message = self.encryptionHandler.encrypt_msg(message)
         for conn, addr in self.clients.values():
-            print("BROADCAST: ",conn)
             conn.send(message)
 
     def respondClockSync(self, message : str, dancerID, timerecv):
@@ -191,7 +203,7 @@ class Ultra96Server():
 
         # response = str(timerecv) + "|" + str(time.time())
         response = json.dumps({'command' : 'clocksync', 'message': str(timerecv) + '|' + str(time.time())})
-        conn.send(response.encode())
+        conn.send(self.encryptionHandler.encrypt_msg(response))
 
     def updateAvgOffset(self):
         for dancerID, offsetList in self.last10Offsets.items():
