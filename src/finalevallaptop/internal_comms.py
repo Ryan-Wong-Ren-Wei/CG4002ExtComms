@@ -12,7 +12,8 @@ SLEEP_SEC = 0.03  # 30ms
 LONG_SLEEP_SEC = 0.04  # for handshaking 40ms
 SHORT_SLEEP_SEC = 0.02  # 5ms
 
-blunoAddress = ['34:14:b5:51:d6:0c', '34:b1:f7:d2:35:f3', '34:14:b5:51:d6:4e']
+blunoAddress = ['80:30:dc:e9:08:8b', '80:30:dc:d9:0c:a7', '80:30:dc:d9:23:3d']
+#blunoAddress = ['34:14:b5:51:d6:0c', '34:b1:f7:d2:35:f3', '34:14:b5:51:d6:4e']
 blunoHandshake = [0, 0, 0]
 connections = [None]
 serviceChars = [None]
@@ -232,6 +233,7 @@ class NotificationDelegate(DefaultDelegate):
 
         # process data
         dt = datetime.datetime.now()
+        dt = dt.strftime("%m/%d/%Y, %H:%M:%S")
         packets = data.split(END_FLAG)
 
         # no delimiter is found in split(), drop the whole buffer
@@ -342,7 +344,9 @@ def connect_to_pi(_name, buffer_tuple, index):
                     if not sendC(serviceChars[index]):
                         raise BleConnectionError(
                             "Failed sending C packet, there is a connection error.")
-
+			
+            time.sleep(0.01)
+	
         except Exception as e:
             print("Expection: " + str(e))
             reconnect(index, buffer_tuple)
@@ -360,7 +364,7 @@ def connect_to_ultra96(_name, tuple ):
         packet = tuple.get()
     
         if packet is not None:
-            logging.debug("{}: Sending new packet: {}".format(datetime.datetime.now(), packet))
+            logging.debug("{}: Sending new packet: {}".format(datetime.now(), packet))
 
 # def main():
 #     p1 = Process(target=connect_to_pi, args=("p1", tuple, 0))

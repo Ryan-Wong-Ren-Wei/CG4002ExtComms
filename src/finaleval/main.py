@@ -5,10 +5,12 @@ from server import Ultra96Server
 import concurrent.futures
 import threading
 from evalClient import EvalClient
+from queue import Queue
 
 class ControlMain():
     def __init__(self):
         self.lockDataQueue = threading.Lock()
+        self.dancerDataDict = {}
 
         #if true, then broadcast clock sync. If false, wait for move eval then set to true
         self.doClockSync = threading.Event()
@@ -29,14 +31,15 @@ class ControlMain():
             executor.submit(self.ultra96Server.handleClient, dancer)
         # executor.submit(self.ultra96Server.handleClockSync)
 
-        self.ultra96Server.broadcastMessage('sync')
+        # self.ultra96Server.broadcastMessage('sync')
 
-        input("Press Enter to connect to eval server")
+        # input("Press Enter to connect to eval server")
 
-        self.evalClient.connectToEval()
+        # self.evalClient.connectToEval()
         # Start ML thingy here
 
         executor.shutdown()
+        print(self.dancerDataDict)
 
 if __name__ == "__main__":
     controlMain = ControlMain()

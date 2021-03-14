@@ -7,6 +7,7 @@ import logging
 import sys
 import multiprocessing
 import random
+from laptopClient import LaptopClient
 
 tuple = Queue()
 
@@ -23,7 +24,6 @@ def connect_to_dummy_internalComms(_name, buffer_tuple, index):
                     "AccelY": random.randint(-40000, 40000),
                     "AccelZ": random.randint(-40000, 40000),
                     "StartFlag": 1,
-                    "Datetime": datetime.datetime.now()
                 }
         
         buffer_tuple.put(dummy_packet)
@@ -42,15 +42,18 @@ def connect_to_ultra96(_name, tuple, type):
     
         if packet is not None:
             logging.debug("{}: Sending new packet: {}".format(datetime.datetime.now(), packet))
-            print(packet)
+            print("95959595959595:", packet)
         else:
             print("No packet founds...")
             
 def main(type='local'):
+    client = LaptopClient("127.0.0.1", 10022)
+    client.start()
     ## for actual implementation, replace connect_to_dummy_internalComms wih internal_comms.connect_to_pi with 
     p1 = Process(target=connect_to_dummy_internalComms, args=("p1", tuple, 0))
 #     p1 = Process(target=internal_comms.connect_to_pi, args=("p1", tuple, 0))    
-    p2 = Process(target=connect_to_ultra96, args=("p2",tuple), type=type)
+    # p2 = Process(target=connect_to_ultra96, args=("p2",tuple, type))
+    p2 = Process(target=client.handleBlunoData, args=(tuple,))
     p1.start()
     p2.start()
     p1.join()

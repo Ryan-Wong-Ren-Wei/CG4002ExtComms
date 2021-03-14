@@ -1,3 +1,4 @@
+from queue import Queue
 import socket
 import sys
 import json
@@ -49,6 +50,7 @@ class Ultra96Server():
         self.encryptionHandler = EncryptionHandler(key.encode())
         self.lockDataQueue = controlMain.lockDataQueue
         self.doClockSync = controlMain.doClockSync
+        self.dancerDataDict = controlMain.dancerDataDict
         return
 
     def initializeConnections(self, numDancers = NUM_DANCERS):
@@ -73,6 +75,7 @@ class Ultra96Server():
                 self.currAvgOffsets[data] = None
                 self.currentMoveReceived[data] = False
                 self.clocksyncCount[data] = 0
+                self.dancerDataDict[data] = Queue()
             return 
         except:
             print(sys.exc_info(), "\n")
@@ -81,6 +84,10 @@ class Ultra96Server():
     def calculateSyncDelay(self):
         sortedTimestamps = sorted(self.currTimeStamps.values())
         return (sortedTimestamps[2] - sortedTimestamps[0])
+
+    def addData(self, dancerID, data):
+        with self.lockDataQueue:
+            self.dancerDataDict[dancerID].put(data)
 
     def handleClient(self, dancerID : str):
         conn,addr = self.clients[dancerID]
@@ -100,13 +107,16 @@ class Ultra96Server():
                     self.respondClockSync(data['message'], dancerID, timerecv)
                 elif data['command'] == "offset":
                     self.updateOffset(data['message'], dancerID)
-                elif data['command'] == "timestamp":
-                    self.updateTimeStamp(data['message'], dancerID)
+                # elif data['command'] == "timestamp":
+                #     self.updateTimeStamp(data['message'], dancerID)
 
-                    self.currentMoveReceived[dancerID] = True
-                    if all(value == True for value in self.currentMoveReceived.values()):
-                        print(f"Sync delay calculated:", {self.calculateSyncDelay()})
-                        self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
+                #     self.currentMoveReceived[dancerID] = True
+                #     if all(value == True for value in self.currentMoveReceived.values()):
+                #         print(f"Sync delay calculated:", {self.calculateSyncDelay()})
+                #         self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
+                elif data['command'] == "data":
+                    data.pop('command')
+                    self.addData(dancerID, data)
 
                 # decrypted_msg = encryptionHandler.decrypt_message(data)
             print(dancerID, " RETURNING\n")

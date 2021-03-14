@@ -1,6 +1,6 @@
 import time 
 import sys
-from threading import local
+from multiprocessing import Event
 import getpass
 from sshtunnel import SSHTunnelForwarder
 from Cryptodome.Cipher import AES
@@ -13,29 +13,90 @@ import socket
 import queue
 from Util.encryption import EncryptionHandler
 
+SHUTDOWNCOMMAND = {'command' : 'shutdown'}
 class LaptopClient():
-    def __init__(self, host, port):
+    def __init__(self, host, port, dancerID):
+        self.moveStarted = Event()
+        self.evalStarted = Event()
         self.host = host
         self.port = port
         self.encryptionHandler = EncryptionHandler(b'Sixteen byte key')
+        self.dancerID = dancerID
 
     def sendMessage(self, message):
         encrypted_message = self.encryptionHandler.encrypt_msg(message)
         self.mySocket.send(encrypted_message)
 
-    def handleBlunoData(self, inputQueue: queue.Queue):
-        packet = None
-        while not inputQueue.empty():
-            packet = None 
-            packet = inputQueue.get()
-    
-            if packet is not None:
-                self.sendMessage(json.dumps(packet))
-                print(packet)
-            else:
-                print("No packet found...")
-            time.sleep(0.1)
-            
+    def handleBlunoData(self, inputQueue):
+        try:
+            packet = None
+            while True:
+                packet = None 
+                packet = inputQueue.get()
+                if packet is not None:
+                    if not self.evalStarted.is_set():
+                        print("Eval not yet started, ignoring data")
+                        print(packet)
+                        continue
+                    if packet['moveFlag'] == 1:
+                        if not self.moveStarted.is_set():
+                            # if move hasn't started, set flag and send timestamp
+                            self.moveStarted.set()
+                            self.sendMessage(json.dumps({"command" : "timestamp", "message" : time.time()}))
+                        packet['command'] = 'data'
+                        self.sendMessage(json.dumps(packet))
+                        print(packet)
+                    else:
+                        self.moveStarted.clear()
+                else:
+                    print("No packet found...")
+        except:
+            print("HANDLEBLUNO", sys.exc_info)
+#            time.sleep(0.1)
+
+    def startClockSync(self):
+        timeSend = time.time()
+        messagedict = {"command" : "clocksync", "message" : str(timeSend)}
+        print(str(timeSend) + '|' + str(time.time()))
+        encrypted_msg = self.encryptionHandler.encrypt_msg(json.dumps(messagedict))
+        self.mySocket.send(encrypted_msg)
+
+        response = self.mySocket.recv(1024)
+        timeRecv = time.time()
+        response = response.decode('utf8')
+        print(response)
+        message = json.loads(response)['message'].split('|')
+        
+        print(f"t1:", {timeSend}, "t2:", \
+            {message[0]}, "t3:", {message[1]}, "t4:", {timeRecv})
+        t = [timeSend, float(message[0]), float(message[1]), timeRecv]
+        
+        roundTripTime = (t[3] - t[0]) - (t[2] - t[1])
+        print("RTT:", {roundTripTime})
+        
+        clockOffset = ((t[2]-t[3]-roundTripTime/2) + (t[1] - t[0] - roundTripTime/2))/2
+        messagedict = {"command" : "offset", "message" : str(clockOffset)}
+        encrypted_msg = self.encryptionHandler.encrypt_msg(json.dumps(messagedict))
+        self.mySocket.send(encrypted_msg)
+        print("Clock offset:", {clockOffset})
+        print("\n")
+
+    def handleServerCommands(self):
+        command = self.mySocket.recv(4096)
+        command = self.encryptionHandler.decrypt_message(command)
+        while command != "quit":
+            if command == "sync":
+                self.startClockSync()
+            elif command == "start":
+                self.evalStarted.set()  
+            command = self.mySocket.recv(4096)
+            command = self.encryptionHandler.decrypt_message(command)
+        print("Shutting down dancer number " + self.dancerID)
+        encrypted_msg = self.encryptionHandler.encrypt_msg(json.dumps(SHUTDOWNCOMMAND))
+        self.mySocket.send(encrypted_msg)
+        self.mySocket.close()
+        print("Quitting now")
+        sys.exit()
 
     def connectAndIdentify(self, host, port, dancerID=random.randint(0,10)):
         self.mySocket = socket.socket()
@@ -73,7 +134,7 @@ class LaptopClient():
                     print('Port no: ' + str(tunnel2.local_bind_port))  
                     self.connectAndIdentify('localhost', tunnel2.local_bind_port, sys.argv[2])
         else:
-            self.connectAndIdentify('127.0.0.1', 10022, sys.argv[2])
+            self.connectAndIdentify('127.0.0.1', 10022, self.dancerID)
 
 if __name__ == "__main__":
     client = LaptopClient("127.0.0.1", 10022)
