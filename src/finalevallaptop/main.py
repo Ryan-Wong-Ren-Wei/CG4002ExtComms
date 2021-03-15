@@ -36,7 +36,7 @@ def blunoDummy(inputQueue):
 
 if __name__ == "__main__":
     client = LaptopClient("127.0.0.1", 10022, "shittyprogrammer")
-    client.start()
+    client.start(remote=True)
     inputQueue = Queue()
             
     # blunoProcess = Process(target=internal_comms.connect_to_pi, args=("p1", inputQueue, 0))

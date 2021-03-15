@@ -105,6 +105,7 @@ class Ultra96Server():
             while True:
                 data = conn.recv(4096)
                 timerecv = time.time()
+                # print("data received at ", timerecv, data)
                 data = self.encryptionHandler.decrypt_message(data)
                 data = json.loads(data)
                 print("Received data:" + json.dumps(data) + "\n")

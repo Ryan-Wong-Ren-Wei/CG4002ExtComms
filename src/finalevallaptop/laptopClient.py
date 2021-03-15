@@ -12,6 +12,7 @@ import random
 import socket
 import queue
 from Util.encryption import EncryptionHandler
+import sshtunnel
 
 SHUTDOWNCOMMAND = {'command' : 'shutdown'}
 class LaptopClient():
@@ -51,9 +52,10 @@ class LaptopClient():
                         self.moveStarted.clear()
                 else:
                     print("No packet found...")
+                time.sleep(0.1)
         except:
             print("HANDLEBLUNO", sys.exc_info)
-            time.sleep(0.1)
+            
 
     def startClockSync(self):
         self.timeSend = time.time()
@@ -102,7 +104,7 @@ class LaptopClient():
         print("Quitting now")
         sys.exit()
 
-    def connectAndIdentify(self, host, port, dancerID=random.randint(0,10)):
+    def connectAndIdentify(self, host, port, dancerID):
         self.mySocket = socket.socket()
         self.mySocket.connect((host,port))
         print(dancerID, ": Connection established with ", (host,port))
@@ -117,26 +119,28 @@ class LaptopClient():
             username = input("Enter ssh username: ")
             password =  getpass.getpass("Enter ssh password: ")
             key = 'Sixteen byte key' #remember to hide
-            with SSHTunnelForwarder(
-                REMOTE_SERVER_IP,
+            tunnel1 = sshtunnel.open_tunnel(
+                (REMOTE_SERVER_IP, 22), 
+                remote_bind_address=(PRIVATE_SERVER_IP, 22),
                 ssh_username=username,
                 ssh_password=password,
-                remote_bind_address=(PRIVATE_SERVER_IP, 22),
-                local_bind_address=('localhost', 10022)
-            ) as tunnel1:
-                print('Tunnel opened to sunfire.comp.nus.edu.sg with...')
-                print('Address: ' + str(tunnel1.local_bind_address))
-                print('Port no: ' + str(tunnel1.local_bind_port))
-                with SSHTunnelForwarder(
-                    ('localhost', 10022),
-                    ssh_username='xilinx',
-                    ssh_password='xilinx',
-                    remote_bind_address=('localhost', 10022)
-                ) as tunnel2:
-                    print('Tunnel opened to ultra96 board with...')
-                    print('Address: ' + str(tunnel2.local_bind_address))
-                    print('Port no: ' + str(tunnel2.local_bind_port))  
-                    self.connectAndIdentify('localhost', tunnel2.local_bind_port, sys.argv[2])
+                # local_bind_address=('127.0.0.1', 8081),
+                block_on_close=False
+            )
+            tunnel1.start()
+            print('[Tunnel Opened] Tunnel into Sunfire opened ' +
+                str(tunnel1.local_bind_port))
+            tunnel2 = sshtunnel.open_tunnel(
+                ssh_address_or_host=(
+                    'localhost', tunnel1.local_bind_port),  # ssh into xilinx
+                remote_bind_address=('127.0.0.1', 10022),  # binds xilinx host
+                ssh_username='xilinx',
+                ssh_password='xilinx',
+                local_bind_address=('127.0.0.1', 10022),  # localhost to bind it to
+                block_on_close=False
+            )
+            tunnel2.start()
+            self.connectAndIdentify('127.0.0.1', 10022, self.dancerID)
         else:
             self.connectAndIdentify('127.0.0.1', 10022, self.dancerID)
 
