@@ -97,6 +97,7 @@ class Ultra96Server():
         timestamp = float(message)
         relativeTS = timestamp - self.currAvgOffsets[dancerID]
         self.currTimeStamps[dancerID] = relativeTS
+        print(dancerID, "adjusted timestamp: ", relativeTS)
 
     def handleClient(self, dancerID : str):
         conn,addr = self.clients[dancerID]
@@ -173,10 +174,10 @@ class Ultra96Server():
             
     def updateOffset(self, message: str, dancerID):
         # self.offsetLock.acquire()
-        print(f"{dancerID} has received offsetlock")
+        # print(f"{dancerID} has received offsetlock")
         self.last10Offsets[dancerID][self.currIndexClockOffset[dancerID]] = float(message)
         self.currIndexClockOffset[dancerID] = (self.currIndexClockOffset[dancerID] - 1) % 10
-        print(f"{dancerID} is releasing offsetlock")
+        # print(f"{dancerID} is releasing offsetlock")
         # self.offsetLock.release()
 
         if self.clocksyncCount[dancerID] != 10:
