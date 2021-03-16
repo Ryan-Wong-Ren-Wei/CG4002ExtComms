@@ -13,6 +13,7 @@ class ControlMain():
     def __init__(self):
         self.lockDataQueue = threading.Lock()
         self.dancerDataDict = {}
+        self.output = None
 
         #if true, then broadcast clock sync. If false, wait for move eval then set to true
         self.doClockSync = threading.Event()
@@ -41,7 +42,7 @@ class ControlMain():
         try:
             # self.evalClient.connectToEval()
             self.ultra96Server.broadcastMessage('start')
-            executor.submit(handleML, self.dancerDataDict["shittyprogrammer"])
+            executor.submit(handleML, self.dancerDataDict["shittyprogrammer"], self.output)
             # Start ML thingy here
         except:
             pass
