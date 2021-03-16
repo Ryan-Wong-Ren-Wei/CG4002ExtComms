@@ -115,19 +115,19 @@ def process_data():
     return processed_data
 
 
-# def process_data_stream(data_stream):
-#     extracted_features = pd.DataFrame()
-#     col_names = ["gyroX", "gyroY", "gyroZ", "accX", "accY", "accZ"]
-#
-#     df = DataFrame(data_stream, names=col_names)
-#
-#     # get extraction functions
-#     functions = [f for f in extraction_functions.__dict__ if
-#                  callable(getattr(extraction_functions, f)) and f.startswith("get_")]
-#     # extract
-#     extracted_feature = extract_segment(df, functions)
-#
-#     return extracted_feature
+def process_data_stream(data_stream):
+    extracted_features = pd.DataFrame()
+    col_names = ["gyroX", "gyroY", "gyroZ", "accX", "accY", "accZ"]
+
+    df = DataFrame(data_stream, names=col_names)
+
+    # get extraction functions
+    functions = [f for f in extraction_functions.__dict__ if
+                 callable(getattr(extraction_functions, f)) and f.startswith("get_")]
+    # extract
+    extracted_feature = extract_segment(df, functions)
+
+    return extracted_feature
 
 
 def process_data_test():

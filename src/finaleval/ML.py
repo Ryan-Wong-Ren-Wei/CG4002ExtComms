@@ -24,12 +24,11 @@ ENCODE = {"dab": 0, "listen": 1, "pointhigh": 2}
 
 #             data_to_evaluate = preprocess.process_data_stream(dataFrame)
 
-def eval_mlp(data):
+def eval_mlp(data, test_model):
     # receive data_segment
     df_test = data
     X_test = df_test
 
-    test_model = load_model("MLP")
     Y_pred = test_model.predict(X_test)
     Y_pred = np.argmax(Y_pred, axis=1)
 
@@ -43,6 +42,7 @@ def eval_mlp(data):
     return y_final
 
 def handleML(inputQueue, output):
+    test_model = load_model("MLP")
     while True:
         dataFrame = []
         if inputQueue.qsize() >= 40:
@@ -52,6 +52,7 @@ def handleML(inputQueue, output):
                 dataFrame.append(dataPoint)
             # print(dataFrame)
             pdDataFrame = pandas.DataFrame(dataFrame)
-            print(pandas.DataFrame(dataFrame))
-            prediction = eval_mlp(pdDataFrame)
+            print(pdDataFrame)
+            data_to_evaluate = preprocess.process_data_stream(pdDataFrame)
+            prediction = eval_mlp(data_to_evaluate, test_model)
             output = prediction[0]
