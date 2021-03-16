@@ -132,6 +132,10 @@ class Ultra96Server():
 
                 # decrypted_msg = encryptionHandler.decrypt_message(data)
             print(dancerID, " RETURNING\n")
+
+        except UnicodeDecodeError:
+            print("Packet incorrectly received")
+            pass
         except:
             print("[ERROR][", dancerID, "] -> ", sys.exc_info())
             print(self.dancerDataDict[dancerID].qsize())
