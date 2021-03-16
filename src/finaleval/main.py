@@ -7,7 +7,7 @@ import threading
 from evalClient import EvalClient
 from queue import Queue
 import time
-from ML import eatQ
+from ML import handleML
 
 class ControlMain():
     def __init__(self):
@@ -41,7 +41,7 @@ class ControlMain():
         try:
             # self.evalClient.connectToEval()
             self.ultra96Server.broadcastMessage('start')
-            executor.submit(eatQ, self.dancerDataDict["shittyprogrammer"])
+            executor.submit(handleML, self.dancerDataDict["shittyprogrammer"])
             # Start ML thingy here
         except:
             pass
