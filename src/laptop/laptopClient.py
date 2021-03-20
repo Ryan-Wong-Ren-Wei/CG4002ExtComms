@@ -49,10 +49,13 @@ class LaptopClient():
                         self.sendMessage(json.dumps(packet))
                         # print(packet)
                     else:
+#                        if self.moveStarted.is_set():
+#                            stopMoveMessage = {"command": "moveComplete"}
+#                            self.sendMessage(stopMoveMessage)     
                         self.moveStarted.clear()
                 else:
                     print("No packet found...")
-                time.sleep(0.1)
+                time.sleep(0.04)
         except:
             print("HANDLEBLUNO", sys.exc_info)
             

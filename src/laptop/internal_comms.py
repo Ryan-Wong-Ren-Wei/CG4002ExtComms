@@ -305,7 +305,7 @@ class NotificationDelegate(DefaultDelegate):
                 "AccelX": accel_data_arr[0],
                 "AccelY": accel_data_arr[1],
                 "AccelZ": accel_data_arr[2],
-                "StartFlag": start_flag,
+                "moveFlag": start_flag,
                 "Datetime": dt
             }
             print(packet)

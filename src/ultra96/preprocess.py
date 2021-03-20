@@ -5,7 +5,7 @@ import extraction_functions
 import numpy as np
 
 # Sampling Rate
-SAMPLING = 40
+SAMPLING = 30
 # Sliding Window Overlap in %
 SLIDING = 0.5
 
@@ -23,14 +23,14 @@ def gradient_of(data):
 
 def extract_segment(segment, functions):
     row = np.empty(0)
-    gyro = segment.iloc[:, 0:3]
-    acc = segment.iloc[:, 3:6]
+    acc = segment.iloc[:, 0:3]
+    gyro = segment.iloc[:, 3:6]
 
     # Getting all the data and extracting row by row
-    for data in [gyro,
-                 acc,
-                 gradient_of(gyro),
+    for data in [acc,
+                 gyro,
                  gradient_of(acc),
+                 gradient_of(gyro),
                  ]:
         for fn in functions:
             # calling each function from the pointer
@@ -41,6 +41,7 @@ def extract_segment(segment, functions):
 
     extracted_segment = row
 
+    print(extracted_segment.shape)
     return extracted_segment
 
 
@@ -51,13 +52,9 @@ def extract_features(segments):
 
     row = np.empty(0)
     for segment in segments:
-        print(segment)
         # each row is an extracted feature for one segement
         row = extract_segment(segment, functions)
         df = np.append(df, row)
-
-    print('last-df')
-    print(df)
 
     df = df.reshape(-1, len(row))
     extracted = pd.DataFrame(df)
@@ -82,7 +79,7 @@ def segment_data(df):
 
 def process_data():
     processed_data = pd.DataFrame()
-    col_names = ["gyroX", "gyroY", "gyroZ", "accX", "accY", "accZ"]
+    col_names = ["accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ"]
 
     for moves_folder in os.listdir(DATA_DIR):
 
@@ -101,25 +98,23 @@ def process_data():
 
                     # extract
                     features = extract_features(segments)
-                    print("running")
 
                     # label data for training
                     label = os.path.basename(moves_folder)
                     features["LABEL"] = label
-                    print("running")
+
 
                     # combine csv files within the same folder
                     processed_data = processed_data.append(features, ignore_index=True)
-                    print("running3")
 
     return processed_data
 
 
 def process_data_stream(data_stream):
-    extracted_features = pd.DataFrame()
-    col_names = ["gyroX", "gyroY", "gyroZ", "accX", "accY", "accZ"]
+    extracted_feature = pd.DataFrame()
+    col_names = ["accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ"]
 
-    df = DataFrame(data_stream, names=col_names)
+    df = data_stream
 
     # get extraction functions
     functions = [f for f in extraction_functions.__dict__ if
@@ -132,10 +127,9 @@ def process_data_stream(data_stream):
 
 def process_data_test():
     extracted_features = pd.DataFrame()
-    col_names = ["gyroX", "gyroY", "gyroZ", "accX", "accY", "accZ"]
+    col_names = ["accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ"]
 
     df = pd.read_csv(TEST_DATA_DIR, names=col_names, header=None)
-    print(df)
     segments = segment_data(df)
 
     # extract

@@ -1,6 +1,6 @@
 from multiprocessing import Queue, Process
 from laptopClient import LaptopClient
-# import internal_comms
+import internal_comms
 import random
 import time
 
@@ -39,8 +39,8 @@ if __name__ == "__main__":
     client.start(remote=True)
     inputQueue = Queue()
             
-    # blunoProcess = Process(target=internal_comms.connect_to_pi, args=("p1", inputQueue, 0))
-    blunoProcess = Process(target=blunoDummy, args=(inputQueue,))    
+    blunoProcess = Process(target=internal_comms.connect_to_pi, args=("p1", inputQueue, 0))
+    #blunoProcess = Process(target=blunoDummy, args=(inputQueue,))    
     handleBlunoDataProcess = Process(target=client.handleBlunoData, args=(inputQueue,))
     handleServerProcess = Process(target=client.handleServerCommands)
     blunoProcess.start()

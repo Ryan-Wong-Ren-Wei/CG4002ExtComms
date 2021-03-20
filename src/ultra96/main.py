@@ -14,13 +14,14 @@ class ControlMain():
         self.lockDataQueue = threading.Lock()
         self.dancerDataDict = {}
         self.output = None
+        self.moveCompletedFlag = threading.Event()
 
         #if true, then broadcast clock sync. If false, wait for move eval then set to true
         self.doClockSync = threading.Event()
         self.doClockSync.set()
 
         self.ultra96Server = Ultra96Server(host='127.0.0.1', port=10022, key="Sixteen byte key", controlMain=self)
-        self.evalClient = EvalClient('127.0.0.1', 10023, controlMain=self)
+        self.evalClient = EvalClient('137.132.92.127', 8888, controlMain=self)
         
     def run(self):
         dancerIDList = []
@@ -40,9 +41,11 @@ class ControlMain():
 
         input("Press Enter to connect to eval server")
         try:
-            # self.evalClient.connectToEval()
+            self.evalClient.connectToEval()
+            time.sleep(10)
+            print("60 seconds time out done, starting evaluation")
             self.ultra96Server.broadcastMessage('start')
-            executor.submit(handleML, self.dancerDataDict["shittyprogrammer"], self.output)
+            executor.submit(handleML, self.dancerDataDict["shittyprogrammer"], self.output, self.moveCompletedFlag, self.evalClient)
             # Start ML thingy here
         except:
             pass
