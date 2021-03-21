@@ -66,7 +66,7 @@ class ControlMain():
         complete = False
         while not complete:
             try:
-                time.sleep(1)
+                pass
             except KeyboardInterrupt:
                 print("Exiting.")
                 self.ultra96Server.broadcastMessage('quit')
