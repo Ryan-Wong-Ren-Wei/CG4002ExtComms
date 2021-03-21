@@ -48,9 +48,10 @@ class ControlMain():
             self.evalClient.connectToEval()
             # time.sleep(60)
             print("60 seconds time out done, starting evaluation")
-            self.ultra96Server.broadcastMessage('start')
+            
             for dancerID in dancerIDList:
                 executor.submit(handleML, self.dancerDataDict[dancerID], self.output, self.moveCompletedFlag, self.evalClient, self.globalShutDown)
+            self.ultra96Server.broadcastMessage('start')
             # Start ML thingy here
         except Exception as e:
             print("Exception, ", e, "Exiting.")

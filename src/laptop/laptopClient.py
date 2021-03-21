@@ -26,6 +26,7 @@ class LaptopClient():
         self.dancerID = dancerID
 
     def sendMessage(self, message):
+        print("SENDING: ", message)
         encrypted_message = self.encryptionHandler.encrypt_msg(message) + b',' #Send b64encoded bytes with ',' delimiter as ',' is not valid b64encoded char
         self.mySocket.send(encrypted_message)
 

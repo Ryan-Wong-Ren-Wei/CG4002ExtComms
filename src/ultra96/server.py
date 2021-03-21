@@ -5,6 +5,7 @@ import json
 import threading
 import concurrent.futures
 import time
+from types import DynamicClassAttribute
 from Util.encryption import EncryptionHandler
 
 NUM_DANCERS = 1
@@ -55,6 +56,15 @@ class Ultra96Server():
         self.globalShutDown = controlMain.globalShutDown
         return
 
+    def recvall(self,conn: socket.socket):
+        fullMessageReceived = False
+        data = b''
+        while not fullMessageReceived:
+            data += conn.recv(1024)
+            if data[-1] == 44: # 44 corresponds to ',' which is delimiter for end of b64 encoded msg
+                fullMessageReceived = True
+        return data
+
     def initializeConnections(self, numDancers = NUM_DANCERS):
         mySocket = socket.socket()
         # host,port = self.connection
@@ -65,7 +75,8 @@ class Ultra96Server():
             for _ in range(numDancers):
                 conn,addr = mySocket.accept()
                 print(conn,addr)
-                data = conn.recv(4096)
+                # data = conn.recv(4096)
+                data = self.recvall(conn)
                 print(data)
                 data = self.encryptionHandler.decrypt_message(data)
                 print("Dancer ID: ", data)
@@ -111,7 +122,8 @@ class Ultra96Server():
             if self.globalShutDown.is_set():
                 return
             try:
-                receivedFromBuffer = conn.recv(4096)
+                # receivedFromBuffer = conn.recv(4096)
+                receivedFromBuffer = self.recvall(conn)
                 timerecv = time.time()
                 packets = receivedFromBuffer.decode('utf8').split(",") #Split into b64encoded packets by ',' delimiter
                 packets.pop(-1)
@@ -134,12 +146,10 @@ class Ultra96Server():
                     elif data['command'] == "timestamp":
                         self.moveCompletedFlag.clear()
                         self.updateTimeStamp(data['message'], dancerID)
-                        print("LINE 121")
                         self.currentMoveReceived[dancerID] = True
                         # if all(value == True for value in self.currentMoveReceived.values()):
                         #     print(f"Sync delay calculated:", {self.calculateSyncDelay()})
                         #     self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
-                        print("LINE 126")
                     elif data['command'] == "data":
                         data.pop('command')
                         self.addData(dancerID, data)
