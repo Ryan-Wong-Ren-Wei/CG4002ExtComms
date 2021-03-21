@@ -26,7 +26,7 @@ class LaptopClient():
         self.dancerID = dancerID
 
     def sendMessage(self, message):
-        encrypted_message = self.encryptionHandler.encrypt_msg(message)
+        encrypted_message = self.encryptionHandler.encrypt_msg(message) + b',' #Send b64encoded bytes with ',' delimiter as ',' is not valid b64encoded char
         self.mySocket.send(encrypted_message)
 
     def handleBlunoData(self, inputQueue):
@@ -44,7 +44,7 @@ class LaptopClient():
                         if not self.moveStarted.is_set():
                             # if move hasn't started, set flag and send timestamp
                             self.moveStarted.set()
-                            self.sendMessage(json.dumps({"command" : "timestamp", "message" : time.time()}))
+                            self.sendMessage(json.dumps({"command" : "timestamp", "message" : packet['time']}))
                         packet['command'] = 'data'
                         self.sendMessage(json.dumps(packet))
                         # print(packet)
@@ -56,16 +56,16 @@ class LaptopClient():
                 else:
                     print("No packet found...")
                 time.sleep(0.04)
-        except:
-            print("HANDLEBLUNO", sys.exc_info)
+        except Exception as e:
+            print("HANDLEBLUNO:", e)
+            sys.exit()
             
 
     def startClockSync(self):
         self.timeSend = time.time()
         messagedict = {"command" : "clocksync", "message" : str(self.timeSend)}
         print("SENDING", messagedict)
-        encrypted_msg = self.encryptionHandler.encrypt_msg(json.dumps(messagedict))
-        self.mySocket.send(encrypted_msg)
+        self.sendMessage(json.dumps(messagedict))
 
     def respondClockSync(self, timestamps, timeRecv):
         timestamps = json.loads(timestamps)['message'].split('|')
@@ -78,8 +78,7 @@ class LaptopClient():
         
         clockOffset = ((t[2]-t[3]-roundTripTime/2) + (t[1] - t[0] - roundTripTime/2))/2
         messagedict = {"command" : "offset", "message" : str(clockOffset)}
-        encrypted_msg = self.encryptionHandler.encrypt_msg(json.dumps(messagedict))
-        self.mySocket.send(encrypted_msg)
+        self.sendMessage(json.dumps(messagedict))
         print("Clock offset:", {clockOffset})
         print("\n")
         
@@ -101,8 +100,7 @@ class LaptopClient():
             command = self.encryptionHandler.decrypt_message(command)
             print("COMMAND RECEIVED:", command)
         print("Shutting down dancer number " + self.dancerID)
-        encrypted_msg = self.encryptionHandler.encrypt_msg(json.dumps(SHUTDOWNCOMMAND))
-        self.mySocket.send(encrypted_msg)
+        self.sendMessage(json.dumps(SHUTDOWNCOMMAND))
         self.mySocket.close()
         print("Quitting now")
         sys.exit()
@@ -111,8 +109,7 @@ class LaptopClient():
         self.mySocket = socket.socket()
         self.mySocket.connect((host,port))
         print(dancerID, ": Connection established with ", (host,port))
-        msg = self.encryptionHandler.encrypt_msg(dancerID)
-        self.mySocket.send(msg)
+        self.sendMessage(dancerID)
 
     def start(self, remote = False):
         if remote:

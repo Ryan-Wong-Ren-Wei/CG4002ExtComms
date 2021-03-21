@@ -7,7 +7,8 @@ import threading
 from evalClient import EvalClient
 from queue import Queue
 import time
-from ML import handleML
+from dummyML import handleML
+import sys
 
 class ControlMain():
     def __init__(self):
@@ -15,17 +16,21 @@ class ControlMain():
         self.dancerDataDict = {}
         self.output = None
         self.moveCompletedFlag = threading.Event()
+        self.globalShutDown = threading.Event()
 
         #if true, then broadcast clock sync. If false, wait for move eval then set to true
         self.doClockSync = threading.Event()
         self.doClockSync.set()
 
         self.ultra96Server = Ultra96Server(host='127.0.0.1', port=10022, key="Sixteen byte key", controlMain=self)
-        self.evalClient = EvalClient('137.132.92.127', 8888, controlMain=self)
+        self.evalClient = EvalClient('127.0.0.1', 8888, controlMain=self)
         
     def run(self):
         dancerIDList = []
-        self.ultra96Server.initializeConnections()
+        try:
+            self.ultra96Server.initializeConnections()
+        except Exception as e:
+            print("Error initializing connections: ", e)
         for key in self.ultra96Server.clients:
             dancerIDList.append(key)
         executor = concurrent.futures.ThreadPoolExecutor()
@@ -33,7 +38,6 @@ class ControlMain():
         
         for dancer in dancerIDList:
             executor.submit(self.ultra96Server.handleClient, dancer)
-        # executor.submit(self.ultra96Server.handleClockSync)
         
         for _ in range(10):
             self.ultra96Server.broadcastMessage('sync')
@@ -42,15 +46,30 @@ class ControlMain():
         input("Press Enter to connect to eval server")
         try:
             self.evalClient.connectToEval()
-            time.sleep(10)
+            # time.sleep(60)
             print("60 seconds time out done, starting evaluation")
             self.ultra96Server.broadcastMessage('start')
-            executor.submit(handleML, self.dancerDataDict["shittyprogrammer"], self.output, self.moveCompletedFlag, self.evalClient)
+            executor.submit(handleML, self.dancerDataDict["shittyprogrammer"], self.output, self.moveCompletedFlag, self.evalClient, self.globalShutDown)
             # Start ML thingy here
-        except:
-            pass
+        except Exception as e:
+            print("Exception, ", e, "Exiting.")
+            self.ultra96Server.broadcastMessage('quit')
+            self.evalClient.sendToEval(quit=True)
+            sys.exit()
 
-        executor.shutdown()
+        complete = False
+        while not complete:
+            try:
+                time.sleep(1)
+            except KeyboardInterrupt:
+                print("Exiting.")
+                self.ultra96Server.broadcastMessage('quit')
+                self.evalClient.sendToEval(quit=True)
+                complete = True
+                executor.shutdown(wait=False,cancel_futures=True)
+                self.globalShutDown.set()
+
+        # executor.shutdown()
 
         for key,value in self.dancerDataDict.items():
             while not value.empty():

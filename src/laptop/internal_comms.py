@@ -232,8 +232,7 @@ class NotificationDelegate(DefaultDelegate):
                 return data
 
         # process data
-        dt = datetime.datetime.now()
-        dt = dt.strftime("%m/%d/%Y, %H:%M:%S")
+        timeRecv = time.time()
         packets = data.split(END_FLAG)
 
         # no delimiter is found in split(), drop the whole buffer
@@ -306,7 +305,7 @@ class NotificationDelegate(DefaultDelegate):
                 "AccelY": accel_data_arr[1],
                 "AccelZ": accel_data_arr[2],
                 "moveFlag": start_flag,
-                "Datetime": dt
+                "time": timeRecv
             }
             print(packet)
             self.buffer_tuple.put(packet)

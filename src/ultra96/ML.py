@@ -1,9 +1,6 @@
 import time
 import sys
-# import pandas
 import os
-# import pandas as pd
-# import numpy as np
 import tflite_runtime.interpreter as tflite
 import numpy as np
 import pandas
@@ -64,7 +61,7 @@ def handleML(inputQueue, output, moveCompletedFlag, evalClient):
                     dataPoint = inputQueue.get()
                     dataPoint.pop('moveFlag')
                     dataPoint.pop('Id')
-                    dataPoint.pop('Datetime')
+                    dataPoint.pop('time')
                     dataFrame.append(dataPoint)
                 print("dataframe retrieved")
                 # print(dataFrame)

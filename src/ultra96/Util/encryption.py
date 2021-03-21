@@ -13,16 +13,19 @@ class EncryptionHandler():
         self.key = key
 
     def encrypt_msg(self, message):
-        cipher = AES.new(self.key, AES.MODE_CBC)
-        message += ' ' * (16 - len(message) % 16)
-        ct_bytes = cipher.encrypt(message.encode('utf8'))
-        iv = cipher.iv
-        # json_bytes = json.dumps({'iv': iv, 'ciphertext': ct}).encode()
-        encryptedMessage = b64encode(iv + ct_bytes)
-        return encryptedMessage
+        try:
+            cipher = AES.new(self.key, AES.MODE_CBC)
+            message += ' ' * (16 - len(message) % 16)
+            ct_bytes = cipher.encrypt(message.encode('utf8'))
+            iv = cipher.iv
+            # json_bytes = json.dumps({'iv': iv, 'ciphertext': ct}).encode()
+            encryptedMessage = b64encode(iv + ct_bytes)
+            return encryptedMessage
+        except Exception as e:
+            return None
 
     def decrypt_message(self, cipher_text):
-        decoded_message = b64decode(cipher_text.decode('utf8'))
+        decoded_message = b64decode(cipher_text)
         iv = decoded_message[:16]
 
         cipher = AES.new(self.key, AES.MODE_CBC, iv)

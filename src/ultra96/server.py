@@ -52,6 +52,7 @@ class Ultra96Server():
         self.doClockSync = controlMain.doClockSync
         self.dancerDataDict = controlMain.dancerDataDict
         self.moveCompletedFlag = controlMain.moveCompletedFlag
+        self.globalShutDown = controlMain.globalShutDown
         return
 
     def initializeConnections(self, numDancers = NUM_DANCERS):
@@ -107,48 +108,56 @@ class Ultra96Server():
     def handleClient(self, dancerID : str):
         conn,addr = self.clients[dancerID]
         while True:
+            if self.globalShutDown.is_set():
+                return
             try:
-                data = conn.recv(4096)
+                receivedFromBuffer = conn.recv(4096)
                 timerecv = time.time()
+                packets = receivedFromBuffer.decode('utf8').split(",") #Split into b64encoded packets by ',' delimiter
+                packets.pop(-1)
                 # print("data received at ", timerecv, data)
-                data = self.encryptionHandler.decrypt_message(data)
-                data = json.loads(data)
-                print("Received data:" + json.dumps(data) + "\n")
-                # print(data.decode("utf8"))
-    
-                if data['command'] == "shutdown":
-                    print(dancerID, ' Received shutdown signal\n')
-                    break
-                elif data['command'] == "clocksync":
-                    self.respondClockSync(data['message'], dancerID, timerecv)
-                elif data['command'] == "offset":
-                    self.updateOffset(data['message'], dancerID)
-                elif data['command'] == "timestamp":
-                    self.moveCompletedFlag.clear()
-                    self.updateTimeStamp(data['message'], dancerID)
-                    print("LINE 121")
-                    self.currentMoveReceived[dancerID] = True
-                    # if all(value == True for value in self.currentMoveReceived.values()):
-                    #     print(f"Sync delay calculated:", {self.calculateSyncDelay()})
-                    #     self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
-                    print("LINE 126")
-                elif data['command'] == "data":
-                    data.pop('command')
-                    self.addData(dancerID, data)
-                elif data['command'] == "moveComplete":
-                    pass
-                    # self.moveCompletedFlag.clear()
+                for packet in packets:
+                    data = self.encryptionHandler.decrypt_message(packet)
+                    if not data:
+                        continue
+                    data = json.loads(data)
+                    # print("Received data:" + json.dumps(data) + "\n")
+                    # print(data.decode("utf8"))
+        
+                    if data['command'] == "shutdown":
+                        print(dancerID, ' Received shutdown signal\n')
+                        break
+                    elif data['command'] == "clocksync":
+                        self.respondClockSync(data['message'], dancerID, timerecv)
+                    elif data['command'] == "offset":
+                        self.updateOffset(data['message'], dancerID)
+                    elif data['command'] == "timestamp":
+                        self.moveCompletedFlag.clear()
+                        self.updateTimeStamp(data['message'], dancerID)
+                        print("LINE 121")
+                        self.currentMoveReceived[dancerID] = True
+                        # if all(value == True for value in self.currentMoveReceived.values()):
+                        #     print(f"Sync delay calculated:", {self.calculateSyncDelay()})
+                        #     self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
+                        print("LINE 126")
+                    elif data['command'] == "data":
+                        data.pop('command')
+                        self.addData(dancerID, data)
+                    elif data['command'] == "moveComplete":
+                        pass
+                        # self.moveCompletedFlag.clear()
             except UnicodeDecodeError:
 
                 print("Packet incorrectly received")
                 pass
-            except:
-                print("[ERROR][", dancerID, "] -> ", sys.exc_info())
+            except Exception as e:
+                print("[ERROR][", dancerID, "] -> ", e)
                 print(self.dancerDataDict[dancerID].qsize())
                 pass
 
             # decrypted_msg = encryptionHandler.decrypt_message(data)
         print(dancerID, " RETURNING\n")
+        return
 
 
     def handleClockSync(self):

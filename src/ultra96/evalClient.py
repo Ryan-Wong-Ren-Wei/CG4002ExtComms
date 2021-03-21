@@ -29,7 +29,7 @@ class EvalClient():
         self.evalSocket.connect(self.server)
 
 if __name__ == "__main__":
-    evalClient = EvalClient('137.132.92.127', 8888, None)
+    evalClient = EvalClient('127.0.0.1', 8888, None)
     evalClient.connectToEval()
     command = input()
     while command != "quit":
