@@ -5,7 +5,7 @@ import preprocess
 DECODE = {0: "dab", 1: "listen", 2: "pointhigh"}
 ENCODE = {"dab": 0, "listen": 1, "pointhigh": 2}
 
-def handleML(inputQueue, output, moveCompletedFlag, evalClient, globalShutDown):
+def handleML(inputQueue, output, moveCompletedFlag, evalClient, globalShutDown, doClockSync):
     try:
         # test_model = load_model("MLP")
         print("Initializing ML model")
@@ -34,6 +34,7 @@ def handleML(inputQueue, output, moveCompletedFlag, evalClient, globalShutDown):
                 print(output)
                 evalClient.sendToEval(action=ENCODE[output],positions=1)
                 moveCompletedFlag.set()
+                doClockSync.set()
                 while not inputQueue.empty():
                     inputQueue.get()
     except:

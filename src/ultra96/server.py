@@ -45,6 +45,9 @@ class Ultra96Server():
     # in current rotation (1-10)
     clocksyncCount = {}
 
+    # To synchronize clock sync broadcasts and offset receiving
+    clockSyncResponseLock = {}
+
     def __init__(self, host:str, port:int, key:str, controlMain):
         self.controlMain = controlMain
         self.connection = (host,port)
@@ -54,6 +57,7 @@ class Ultra96Server():
         self.dancerDataDict = controlMain.dancerDataDict
         self.moveCompletedFlag = controlMain.moveCompletedFlag
         self.globalShutDown = controlMain.globalShutDown
+        
         return
 
     def recvall(self,conn: socket.socket):
@@ -89,6 +93,7 @@ class Ultra96Server():
                 self.currentMoveReceived[data] = False
                 self.clocksyncCount[data] = 0
                 self.dancerDataDict[data] = Queue()
+                self.clockSyncResponseLock[data] = threading.Event()
             return 
         except:
             print(sys.exc_info(), "\n")
@@ -142,6 +147,7 @@ class Ultra96Server():
                     elif data['command'] == "clocksync":
                         self.respondClockSync(data['message'], dancerID, timerecv)
                     elif data['command'] == "offset":
+                        self.clockSyncResponseLock[dancerID].set()
                         self.updateOffset(data['message'], dancerID)
                     elif data['command'] == "timestamp":
                         self.moveCompletedFlag.clear()
@@ -170,10 +176,15 @@ class Ultra96Server():
         return
 
 
-    def handleClockSync(self):
+    def handleClockSync(self, dancerID):
         while True:
+            if self.globalShutDown.is_set():
+                return
             self.doClockSync.wait()
-            self.broadcastMessage('sync')
+            for _ in range(10):
+                self.broadcastMessage('sync')
+                self.clockSyncResponseLock[dancerID].clear()
+                self.clockSyncResponseLock[dancerID].wait()
             self.doClockSync.clear()
 
     # Check if variance between 10 offsets in dancerID is too high.

@@ -39,10 +39,14 @@ class ControlMain():
         for dancer in dancerIDList:
             executor.submit(self.ultra96Server.handleClient, dancer)
         
-        for _ in range(10):
-            self.ultra96Server.broadcastMessage('sync')
-            time.sleep(0.4)
+        
+        # for _ in range(10):
+        #     self.ultra96Server.broadcastMessage('sync')
+        #     time.sleep(0.5)
 
+        time.sleep(3)
+        for dancer in dancerIDList:
+            executor.submit(self.ultra96Server.handleClockSync, dancer)
         input("Press Enter to connect to eval server")
         try:
             self.evalClient.connectToEval()
@@ -50,7 +54,7 @@ class ControlMain():
             print("60 seconds time out done, starting evaluation")
             
             for dancerID in dancerIDList:
-                executor.submit(handleML, self.dancerDataDict[dancerID], self.output, self.moveCompletedFlag, self.evalClient, self.globalShutDown)
+                executor.submit(handleML, self.dancerDataDict[dancerID], self.output, self.moveCompletedFlag, self.evalClient, self.globalShutDown, self.doClockSync)
             self.ultra96Server.broadcastMessage('start')
             # Start ML thingy here
         except Exception as e:
