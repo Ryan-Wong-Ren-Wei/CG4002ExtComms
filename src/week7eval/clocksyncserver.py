@@ -171,7 +171,8 @@ class Ultra96Server:
                 if data['command'] == "shutdown":
                     print(dancerID, ' Received shutdown signal\n')
                     break
-                elif data['command'] == "CS":
+                elif data['command'] == "clocksync":
+                    print("cLoCkSyNc")
                     self.respondClockSync(data['message'], dancerID, timerecv)
                 elif data['command'] == "offset":
                     self.updateOffset(data['message'], dancerID)
