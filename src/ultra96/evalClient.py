@@ -20,6 +20,10 @@ class EvalClient():
 
         message = self.encryptionHandler.encrypt_msg(message)
         self.evalSocket.send(message)
+
+        if quit:
+            return
+            
         data = self.evalSocket.recv(1024).decode()
         print ('Received from server: ' + data)
 

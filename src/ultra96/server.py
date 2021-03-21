@@ -180,21 +180,6 @@ class Ultra96Server():
             conn.send(self.encryptionHandler.encrypt_msg("sync"))
         
         return
-
-    def handleServerInput(self):
-        command = input("The rest of this test script will be controlled via " +
-            "server side input. Type 'sync' to perform clock synchronization " +
-            "protocol and 'start' to broadcast start signal to all laptops/dancers\n")
-
-
-        while command != "quit":
-            if command == "sync":
-                self.broadcastMessage("sync")
-            if command == "start":
-                self.broadcastMessage("start")
-            command = input("Enter 'sync' to start clock sync and 'start' "+
-                "to send start signal for move eval")
-        self.broadcastMessage("quit")
             
     def updateOffset(self, message: str, dancerID):
         # self.offsetLock.acquire()

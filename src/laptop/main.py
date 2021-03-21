@@ -4,6 +4,7 @@ from laptopClient import LaptopClient
 import random
 import time
 import datetime
+import sys
 
 def blunoDummy(inputQueue):
     while True:
@@ -41,8 +42,14 @@ def blunoDummy(inputQueue):
 
 
 if __name__ == "__main__":
-    client = LaptopClient("127.0.0.1", 10022, "shittyprogrammer")
-    client.start(remote=False)
+    dancerID = sys.argv[1].strip()
+    client = LaptopClient("127.0.0.1", 10022, dancerID)
+    remote = False
+    if len(sys.argv) > 2 and sys.argv[2].strip() == "remote":
+        client.start(remote=True)
+    else:
+        client.start()
+
     inputQueue = Queue()
             
     # blunoProcess = Process(target=internal_comms.connect_to_pi, args=("p1", inputQueue, 0))

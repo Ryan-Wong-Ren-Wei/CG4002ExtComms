@@ -10,7 +10,7 @@ def decrypt_message(cipher_text):
         decoded_message = base64.b64decode(cipher_text)
         iv = decoded_message[:16]
         secret_key = bytes(str('Sixteen byte key'), encoding="utf8") 
-        print("HI")
+        # print("HI")
         cipher = AES.new(secret_key, AES.MODE_CBC, iv)
         decrypted_message = cipher.decrypt(decoded_message[16:]).strip()
         decrypted_message = decrypted_message.decode('utf8')
@@ -46,6 +46,7 @@ if __name__ == "__main__":
                 print(f"msg", {msg})
                 decrypted_message = decrypt_message(msg)
                 if decrypted_message['action'] == "logout":
+                    print("logout")
                     conn.close()
                     sys.exit()
                 elif len(decrypted_message['action']) == 0:
@@ -55,5 +56,6 @@ if __name__ == "__main__":
                                                                 decrypted_message['action'], 
                                                                 decrypted_message['sync']))
                     conn.sendall(str(['1','2','3']).encode())
+            
             except Exception as e:
                 print(e)
