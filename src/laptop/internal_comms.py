@@ -1,5 +1,6 @@
 from bluepy.btle import Scanner, DefaultDelegate, Peripheral, BTLEException, BTLEDisconnectError, ADDR_TYPE_RANDOM
 from multiprocessing import Queue, Process
+from collections import deque 
 import threading
 import time
 import datetime
@@ -13,13 +14,55 @@ LONG_SLEEP_SEC = 0.04  # for handshaking 40ms
 SHORT_SLEEP_SEC = 0.02  # 5ms
 
 blunoAddress = ['80:30:dc:e9:08:8b', '80:30:dc:d9:0c:a7', '80:30:dc:d9:23:3d']
-#blunoAddress = ['34:14:b5:51:d6:0c', '34:b1:f7:d2:35:f3', '34:14:b5:51:d6:4e']
+# blunoAddress = ['34:14:b5:51:d6:0c', '34:b1:f7:d2:35:f3', '34:14:b5:51:d6:4e']
 blunoHandshake = [0, 0, 0]
 connections = [None]
 serviceChars = [None]
 
-tuple = Queue()
+yAccelDeque = deque([])
 
+def updateYAccelDeque(newYAccel, motion_flag):
+    global yAccelDeque
+
+    if motion_flag == 0:
+        yAccelDeque.appendleft(newYAccel)
+    else:
+        yAccelDeque.appendleft(0)
+    
+    if(len(yAccelDeque)> 100):
+        yAccelDeque.pop()
+    
+    print("current circular buffer size: " + str(len(yAccelDeque)))
+
+def getPosChangeFlag():
+    global yAccelDeque
+    ## iterate over deque to find max
+    maxY = -900000
+    minY = 900000
+    maxYIndex = 0
+    minYIndex = 0
+
+    for i in range(0, len(yAccelDeque)):
+        yAccel = yAccelDeque[i]
+        if yAccel < minY:
+            minY = yAccel
+            minYIndex = i
+        if yAccel > maxY:
+            maxY = yAccel
+            maxYIndex = i
+
+    ## moving right
+    if (minY < -60 and maxY > 80 and minYIndex > maxYIndex):
+        return -1
+
+    ## moving left
+    elif (minY < -60 and maxY > 80 and minYIndex < maxYIndex ):
+        return 1
+
+    ## netural
+    return 0
+    
+    
 def calculateChecksum(str):
     result = 0
     for char in str:
@@ -106,7 +149,6 @@ def establishConnection(index, buffer_tuple):
 def performHandshake(index):
     global blunoHandshake
     global connections, serviceChars
-    global clearIncomingSerialFlag
     handshake_count = 0
     while blunoHandshake[index] == 0 and handshake_count <= 5:
         print("Performing handshake with bluno " + str(index))
@@ -149,7 +191,6 @@ def reconnect(index, buffer_tuple):
     reconnection_attempts = 0
     blunoHandshake[index] = 0
     connections[index] = None
-    reconnection_count = 0
 
     while True:
         try:
@@ -165,7 +206,7 @@ def reconnect(index, buffer_tuple):
             continue
 
         reconnection_attempts += 1
-        print("Reconnection attempt {}...".format(
+        print("Bluno {} Reconnection attempt {}...".format(
             str(index), str(reconnection_attempts)))
         time.sleep(SLEEP_SEC)
     print("\n\n#################### Successfully reconnected to bluno " +
@@ -232,7 +273,9 @@ class NotificationDelegate(DefaultDelegate):
                 return data
 
         # process data
-        timeRecv = time.time()
+        time_recv = time.time()
+        # dt = datetime.datetime.now()
+        # dt = dt.strftime("%m/%d/%Y, %H:%M:%S")
         packets = data.split(END_FLAG)
 
         # no delimiter is found in split(), drop the whole buffer
@@ -274,11 +317,9 @@ class NotificationDelegate(DefaultDelegate):
 
                 content_tokens = tokens[0].split(DELIMITER)
 
-                if len(content_tokens) != 7:
-                    raise DataProcessingError(
-                        "Packet corrupted! There are {} tokens (excluding checksum)".format(len(content_tokens)))
-
-                start_flag = int(content_tokens[6])
+#                 if len(content_tokens) != 9:
+#                     raise DataProcessingError(
+#                         "Packet corrupted! There are {} tokens (excluding checksum)".format(len(content_tokens)))
 
                 gyro_data_arr = [
                     int(content_tokens[0]),
@@ -291,6 +332,22 @@ class NotificationDelegate(DefaultDelegate):
                     int(content_tokens[4]),
                     int(content_tokens[5])
                 ]
+                
+                motion_flag = int(content_tokens[6])
+                emg = int(content_tokens[7])
+                
+                pos_change_flag = 0
+                ## push accelY or 0 to circular buffer
+                updateYAccelDeque(accel_data_arr[1], motion_flag)
+
+                ## get pos change if in neutral
+                if motion_flag == 0:
+                    print("no motion!")
+                    pos_change_flag = getPosChangeFlag()
+                    
+                    if pos_change_flag != 0:
+                        print("position change detected!!!")
+                        yAccelDeque.clear() ## clear Deque
 
             except Exception as e:
                 print("Data corrupted! Parsing error: \n" + str(e))
@@ -304,9 +361,11 @@ class NotificationDelegate(DefaultDelegate):
                 "AccelX": accel_data_arr[0],
                 "AccelY": accel_data_arr[1],
                 "AccelZ": accel_data_arr[2],
-                "moveFlag": start_flag,
-                "time": timeRecv
+                "MoveFlag": motion_flag,
+                "PosChangeFlag": pos_change_flag,
+                "Time": time_recv
             }
+            print("Emg: " + str(emg))
             print(packet)
             self.buffer_tuple.put(packet)
 
@@ -343,38 +402,8 @@ def connect_to_pi(_name, buffer_tuple, index):
                     if not sendC(serviceChars[index]):
                         raise BleConnectionError(
                             "Failed sending C packet, there is a connection error.")
-			
-            time.sleep(0.01)
-	
+
         except Exception as e:
             print("Expection: " + str(e))
             reconnect(index, buffer_tuple)
             start_t = time.time()
-
-#         waitForAllConnections(index)
-
-def connect_to_ultra96(_name, tuple ):
-    # TODO: Connect to ultra96
-    logging.basicConfig(filename='ble_integrate.log',
-                        filemode='w', level=logging.DEBUG)
-    packet = None
-    while True:
-        packet = None 
-        packet = tuple.get()
-    
-        if packet is not None:
-            logging.debug("{}: Sending new packet: {}".format(datetime.now(), packet))
-
-# def main():
-#     p1 = Process(target=connect_to_pi, args=("p1", tuple, 0))
-#     p2 = Process(target=connect_to_ultra96, args=("p2",tuple))
-#     p1.start()
-#     p2.start()
-#     p1.join()
-#     p2.join()
-# 
-# 
-# if __name__ == '__main__':
-#     time.sleep(3)
-#     main()
-
