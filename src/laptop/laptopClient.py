@@ -41,6 +41,8 @@ class LaptopClient():
                         # print("Eval not yet started, ignoring data")
                         # print(packet)
                         continue
+                    if packet['PosChangeFlag'] != 0:
+                        self.sendMessage(json.dumps({"command" : "poschange", "message" : packet['PosChangeFlag']}))
                     if packet['moveFlag'] == 1:
                         if not self.moveStarted.is_set():
                             # if move hasn't started, set flag and send timestamp

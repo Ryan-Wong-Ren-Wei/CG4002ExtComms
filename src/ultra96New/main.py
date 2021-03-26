@@ -19,8 +19,15 @@ class ControlMain():
         self.moveCompletedFlag = threading.Event()
         self.currPrediction = None
         self.dataQueues = [Queue() for _ in range(NUM_DANCERS)]
-        self.outputForEval = {"positions": 1, "action" : None, "delay" : None}
+        self.dataQueueLock = threading.Event()
+        self.outputForEval = {"positions": None, "action" : None, "delay" : None}
         self.rdyForEval = threading.Event()
+
+        # Logic list of current dancer positions
+        self.dancerPositions = [1,2,3]
+
+        # Logic list of position change data received from laptop
+        self.positionChange = [0,0,0]
         pass
         
     def run(self):
@@ -32,7 +39,7 @@ class ControlMain():
         
         executor = concurrent.futures.ThreadPoolExecutor()
 
-        self.server.executeClientHandlers(executor, self.dataQueues)
+        self.server.executeClientHandlers(executor, self.dataQueues, self.dataQueueLock, self.positionChange)
         time.sleep(3)
 
         self.server.executeClockSyncHandlers(executor, self.doClockSync)
@@ -41,8 +48,9 @@ class ControlMain():
         input("Press Enter to connect to eval server")
         self.evalClient.connectToEval()
         # time.sleep(60) 
-        executor.submit(handleML, self.dataQueues, self.outputForEval, self.globalShutDown, self.rdyForEval)
-        executor.submit(self.evalClient.handleEval, self.outputForEval, self.rdyForEval)
+        executor.submit(handleML, self.dataQueues, self.outputForEval, self.globalShutDown, self.rdyForEval, self.dataQueueLock)
+        executor.submit(self.evalClient.handleEval, self.outputForEval, self.rdyForEval, self.server, self.globalShutDown,
+            self.dancerPositions, self.positionChange)
         self.server.broadcastMessage('start')
 
 

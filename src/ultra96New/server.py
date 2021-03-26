@@ -1,4 +1,5 @@
-from concurrent.futures.thread import ThreadPoolExecutor
+from concurrent.futures import thread
+from concurrent.futures.thread import BrokenThreadPool, ThreadPoolExecutor
 from multiprocessing import Queue
 import socket
 import sys
@@ -30,8 +31,9 @@ class Dancer():
         self.clockSyncCount = 0 
         self.dataQueue = Queue()
 
-    def handleClient(self, dataQueue):
+    def handleClient(self, dataQueue, dataQueueLock: threading.Event, positionChange: list):
         self.dataQueue = dataQueue
+        self.dataQueueLock = dataQueueLock
         conn = self.conn
         while True:
             try:
@@ -48,38 +50,52 @@ class Dancer():
                     # print(data.decode("utf8"))
         
                     if data['command'] == "shutdown":
-                        print(self.clockSyncResponseLockdancerID, ' Received shutdown signal\n')
-                        break
+                        print(self.dancerID, ' Received shutdown signal\n')
+                        return
+
                     elif data['command'] == "clocksync":
                         self.respondClockSync(data['message'], conn, timerecv, self.dancerID)
+
                     elif data['command'] == "offset":
                         self.updateOffset(data['message'])
                         self.clockSyncResponseLock.set()
                         
                     elif data['command'] == "timestamp":
-                        pass
-                        # self.moveCompletedFlag.clear()
-                        # self.updateTimeStamp(data['message'], dancerID)
-                        # self.currentMoveReceived[dancerID] = True
-                        # if all(value == True for value in self.currentMoveReceived.values()):
-                        #     print(f"Sync delay calculated:", {self.calculateSyncDelay()})
-                        #     self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
+                        # unlock data queue to store data
+                        self.dataQueueLock.clear()
+                        self.updateTimeStamp(data['message'])
+
                     elif data['command'] == "data":
                         data.pop('command')
+                        data.pop('PosChangeFlag')
                         self.addData(data)
+
+                    elif data['command'] == "poschange":
+                        self.updatePosition(data['message'], positionChange)
+
             except Exception as e:
                 print("[ERROR][HANDLECLIENT]:", self.dancerID, e)
                 return
     
+    def updatePosition(self, data, positionChange: list):
+        change = int(data)
+        positionChange[self.dancerID] += change
+        print("Dancer", self.dancerID, "Received position change data", data,
+            "\nNewData: ", positionChange)
+        return
+    
+    def updateTimeStamp(self, data):
+        timestamp = float(data)
+        relativeTimeStamp = timestamp - self.currAvgOffset
+        self.currTimeStamp = relativeTimeStamp
+        print("Dancer: ", self.dancerID, "bluno recorded TS: ", timestamp, "adjusted TS: ", self.currTimeStamp)
+    
     def addData(self, data):
-        self.dataQueue.put(data)
-        # with self.lockDataQueue:
-        #     if not self.moveCompletedFlag.is_set():
-        #         self.dancerDataDict[dancerID].put(data)
-        #     else:
-        #         while not self.dancerDataDict[dancerID].empty():
-        #             self.dancerDataDict[dancerID].get()
-
+        if not self.dataQueueLock.is_set():
+            self.dataQueue.put(data)
+        else:
+            while not self.dataQueue.empty():
+                self.dataQueue.get()
 
 
     def recvall(self,conn: socket.socket):
@@ -167,10 +183,10 @@ class Ultra96Server():
         except Exception as e:
             print("[ERROR][initializeConnections]", e)
 
-    def executeClientHandlers(self, executor, dataQueues):
+    def executeClientHandlers(self, executor, dataQueues, dataQueueLock, positionChange):
         dancerID = 0
         for dancer in self.dancers:
-            executor.submit(dancer.handleClient, dataQueues[dancerID])
+            executor.submit(dancer.handleClient, dataQueues[dancerID], dataQueueLock, positionChange)
             dancerID += 1
     
     def executeClockSyncHandlers(self, executor, doClockSync: threading.Event):
@@ -191,6 +207,13 @@ class Ultra96Server():
         message = self.encryptionHandler.encrypt_msg(message)
         for dancer in self.dancers:
             dancer.conn.send(message)
+
+    def getSyncDelay(self) -> float:
+        timeStampList = []
+        for dancer in self.dancers:
+            timeStampList.append(dancer.currTimeStamp)
+        sortedTimeStamps = sorted(timeStampList)
+        return sortedTimeStamps[NUM_DANCERS - 1] - sortedTimeStamps[0]
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+from random import randint
+from server import Ultra96Server
 from Util.encryption import EncryptionHandler
 import socket
 import threading
@@ -13,10 +15,12 @@ class EvalClient():
         self.encryptionHandler = EncryptionHandler(b'Sixteen byte key')
         pass
 
-    def sendToEval(self, positions=None, action=None, sync_delay=None, quit=False):
+    def sendToEval(self, positions=randint(0,5), action=None, sync_delay=0, quit=False):
         if quit:
             message = '# |logout| '
         else:
+            if positions == None:
+                positions = randint(0,5)
             message = '#' + self.POSITIONS[positions] + '|' + self.ACTIONS[action] + '|' + str(sync_delay)
 
         message = self.encryptionHandler.encrypt_msg(message)
@@ -27,14 +31,83 @@ class EvalClient():
             
         data = self.evalSocket.recv(1024).decode()
         print ('Received from server: ' + data)
+        return data
+    
+    def updateDancerPositions(self, dancerPositions, positionChange):
+        middleDancerIndex = int(dancerPositions[1]) - 1
+        leftDancerIndex = int(dancerPositions[0]) - 1
+        rightDancerIndex = int(dancerPositions[2]) - 1
 
-    def handleEval(self, outputForEval, rdyForEval : threading.Event):
+        # middle dancer doesn't move
+        if positionChange[middleDancerIndex] == 0:
+            # all dancers don't move
+            if positionChange[rightDancerIndex] == 0 and positionChange[leftDancerIndex] == 0:
+                print("[UPDATE DANCER POSITIONS][NO CHANGE]", dancerPositions)
+                positionChange = [0,0,0]
+                return
+
+            elif positionChange[rightDancerIndex] < 0 and positionChange[leftDancerIndex] > 0:
+                temp = dancerPositions[0]
+                dancerPositions[0] = dancerPositions[2]
+                dancerPositions[2] = temp
+                print("[UPDATE DANCER POSITIONS][RIGHT AND LEFT SWAP POSITIONS]", dancerPositions)
+            
+            else:
+                print("[UPDATE DANCER POSITIONS][INVALID CHANGE]", dancerPositions)
+
+        # middle dancer moves right
+        elif positionChange[middleDancerIndex] > 0:
+            if positionChange[leftDancerIndex] > 0 and positionChange[rightDancerIndex] < 0:
+                dancerPositions[2] = middleDancerIndex + 1
+                dancerPositions[0] = rightDancerIndex + 1
+                dancerPositions[1] = leftDancerIndex + 1
+                print("[UPDATE DANCER POSITIONS][MIDDLE & LEFT DANCERS MOVE RIGHT, RIGHT DANCER MOVES LEFT", dancerPositions)
+
+            elif positionChange[leftDancerIndex] == 0 and positionChange[rightDancerIndex] < 0:
+                dancerPositions[2] = middleDancerIndex + 1
+                dancerPositions[1] = rightDancerIndex + 1
+                print("[UPDATE DANCER POSITIONS][LEFT DANCER STAYS, MIDDLE DANCER MOVES RIGHT, RIGHT DANCER MOVES LEFT", dancerPositions)
+
+            else:
+                print("[UPDATE DANCER POSITIONS][INVALID CHANGE]", dancerPositions)
+
+        #middle dancer moves left
+        else:
+            if positionChange[leftDancerIndex] > 0 and positionChange[rightDancerIndex] < 0:
+                dancerPositions[0] = middleDancerIndex + 1
+                dancerPositions[1] = rightDancerIndex + 1
+                dancerPositions[2] = leftDancerIndex + 1
+                print("[UPDATE DANCER POSITIONS][MIDDLE & RIGHT DANCERS MOVE LEFT, LEFT DANCER MOVES RIGHT", dancerPositions)
+
+            elif positionChange[rightDancerIndex] == 0 and positionChange[leftDancerIndex] > 0:
+                dancerPositions[0] = middleDancerIndex + 1
+                dancerPositions[1] = rightDancerIndex + 1
+                print("[UPDATE DANCER POSITIONS][RIGHT DANCER STAYS, MIDDLE DANCER MOVES LEFT, LEFT DANCER MOVES RIGHT", dancerPositions)
+
+            else:
+                print("[UPDATE DANCER POSITIONS][INVALID CHANGE]", dancerPositions)
+
+        print("Positions updated, resetting position change")
+        for x in range(len(positionChange)):
+            positionChange[x] = 0
+
+    def handleEval(self, outputForEval, rdyForEval : threading.Event, server: Ultra96Server,
+        globalShutDown: threading.Event, dancerPositions: list, positionChange: list):
+
         while True:
-            rdyForEval.wait()
-            print("SENDING TO EVAL SERVER: ", outputForEval)
-            self.sendToEval(outputForEval['positions'], outputForEval['action'], outputForEval['delay'])
-
-                
+            if globalShutDown.is_set():
+                return
+            try:
+                rdyForEval.wait()
+                print("HELLO UPDATING DANCERPERMPEAIJFPEIJF")
+                self.updateDancerPositions(dancerPositions, positionChange)
+                outputForEval['delay'] = server.getSyncDelay()
+                print("SENDING TO EVAL SERVER: ", outputForEval)
+                servResponse = self.sendToEval(outputForEval['positions'], outputForEval['action'], outputForEval['delay'])
+                rdyForEval.clear()  
+            except Exception as e:
+                print("[ERROR][EVALCLIENT]", e)
+                return
 
     def connectToEval(self):
         self.evalSocket = socket.socket()

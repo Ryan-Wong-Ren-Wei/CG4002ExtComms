@@ -8,7 +8,7 @@ import sys
 
 def blunoDummy(inputQueue):
     while True:
-        for _ in range(60):
+        for _ in range(50):
             dummy_packet = None
             dummy_packet = {
                         "Id": 1,
@@ -19,12 +19,30 @@ def blunoDummy(inputQueue):
                         "AccelY": random.randint(-40000, 40000),
                         "AccelZ": random.randint(-40000, 40000),
                         "time": time.time(),
+                        "PosChangeFlag" : 0,
                         "moveFlag": 0
                     }
             inputQueue.put(dummy_packet)
             time.sleep(0.04)
 
-        for _ in range(60):
+        posChangeFlag = random.randint(-1,1)
+        for _ in range(random.randint(1,2)):
+            dummy_packet = {
+                        "Id": 1,
+                        "GyroX": random.randint(-40000, 40000),
+                        "GyroY": random.randint(-40000, 40000),
+                        "GyroZ": random.randint(-40000, 40000),
+                        "AccelX": random.randint(-40000, 40000),
+                        "AccelY": random.randint(-40000, 40000),
+                        "AccelZ": random.randint(-40000, 40000),
+                        "time": time.time(),
+                        "PosChangeFlag" : posChangeFlag,
+                        "moveFlag": 0
+                    }
+            inputQueue.put(dummy_packet)
+            time.sleep(0.04)
+
+        for _ in range(50):
             dummy_packet = None
             dummy_packet = {
                         "Id": 1,
@@ -35,10 +53,11 @@ def blunoDummy(inputQueue):
                         "AccelY": random.randint(-40000, 40000),
                         "AccelZ": random.randint(-40000, 40000),
                         "time": time.time(),
+                        "PosChangeFlag" : 0,
                         "moveFlag": 1
                     }
             inputQueue.put(dummy_packet)
-            time.sleep(0.05)
+            time.sleep(0.04)
 
 
 if __name__ == "__main__":
@@ -57,9 +76,11 @@ if __name__ == "__main__":
     handleBlunoDataProcess = Process(target=client.handleBlunoData, args=(inputQueue,))
     handleServerProcess = Process(target=client.handleServerCommands)
     try:
-        blunoProcess.start()
+        
         handleBlunoDataProcess.start()
         handleServerProcess.start()
+        input('press enter to start bluno')
+        blunoProcess.start()
 
         blunoProcess.join()
         handleBlunoDataProcess.join()
