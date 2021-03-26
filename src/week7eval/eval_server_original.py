@@ -52,7 +52,7 @@ class Server(threading.Thread):
         self.action_set_time = None
 
         self.idx = 0
-        self.timeout = 3
+        self.timeout = 15
         self.has_no_response = False
         self.connection = None
         self.timer = None
