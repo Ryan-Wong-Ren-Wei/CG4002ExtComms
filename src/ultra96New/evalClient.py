@@ -1,14 +1,14 @@
 from random import randint
-from server import Ultra96Server
+from server import NUM_DANCERS, Ultra96Server
 from Util.encryption import EncryptionHandler
 import socket
 import threading
 
+POSITIONS = ['1 2 3', '3 2 1', '2 3 1', '3 1 2', '1 3 2', '2 1 3']   
+POSITIONS_DICT = {'1 2 3' : 0, '3 2 1' : 1, '2 3 1' : 2, '3 1 2' : 3, '1 3 2' : 4, '2 1 3' : 5}
+ACTIONS = ['gun', 'sidepump', 'hair'] 
+
 class EvalClient():
-
-    POSITIONS = ['1 2 3', '3 2 1', '2 3 1', '3 1 2', '1 3 2', '2 1 3']       
-    ACTIONS = ['gun', 'sidepump', 'hair'] 
-
     def __init__(self, host:str, port:int, controlMain):
         self.controlMain = controlMain
         self.server = (host,port)
@@ -21,7 +21,7 @@ class EvalClient():
         else:
             if positions == None:
                 positions = randint(0,5)
-            message = '#' + self.POSITIONS[positions] + '|' + self.ACTIONS[action] + '|' + str(sync_delay)
+            message = '#' + POSITIONS[positions] + '|' + ACTIONS[action] + '|' + str(sync_delay)
 
         message = self.encryptionHandler.encrypt_msg(message)
         self.evalSocket.send(message)
@@ -81,7 +81,7 @@ class EvalClient():
 
             elif positionChange[rightDancerIndex] == 0 and positionChange[leftDancerIndex] > 0:
                 dancerPositions[0] = middleDancerIndex + 1
-                dancerPositions[1] = rightDancerIndex + 1
+                dancerPositions[1] = leftDancerIndex + 1
                 print("[UPDATE DANCER POSITIONS][RIGHT DANCER STAYS, MIDDLE DANCER MOVES LEFT, LEFT DANCER MOVES RIGHT", dancerPositions)
 
             else:
@@ -99,9 +99,14 @@ class EvalClient():
                 return
             try:
                 rdyForEval.wait()
-                print("HELLO UPDATING DANCERPERMPEAIJFPEIJF")
                 self.updateDancerPositions(dancerPositions, positionChange)
                 outputForEval['delay'] = server.getSyncDelay()
+                positionsStr = ''
+                for dancerPosition in dancerPositions:
+                    positionsStr += str(dancerPosition) + ' '
+                positionsStr = positionsStr.strip()
+                
+                outputForEval['positions'] = POSITIONS_DICT[positionsStr]
                 print("SENDING TO EVAL SERVER: ", outputForEval)
                 servResponse = self.sendToEval(outputForEval['positions'], outputForEval['action'], outputForEval['delay'])
                 rdyForEval.clear()  
