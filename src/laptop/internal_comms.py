@@ -13,7 +13,7 @@ SLEEP_SEC = 0.03  # 30ms
 LONG_SLEEP_SEC = 0.04  # for handshaking 40ms
 SHORT_SLEEP_SEC = 0.02  # 5ms
 
-blunoAddress = ['80:30:dc:e9:08:8b', '80:30:dc:d9:0c:a7', '80:30:dc:d9:23:3d']
+blunoAddress = ['80:30:DC:D9:0C:A7', '34:14:B5:51:D1:32', '34:14:B5:51:D6:0C']
 # blunoAddress = ['34:14:b5:51:d6:0c', '34:b1:f7:d2:35:f3', '34:14:b5:51:d6:4e']
 blunoHandshake = [0, 0, 0]
 connections = [None]
@@ -29,7 +29,7 @@ def updateYAccelDeque(newYAccel, motion_flag):
     else:
         yAccelDeque.appendleft(0)
     
-    if(len(yAccelDeque)> 100):
+    if(len(yAccelDeque)> 30):
         yAccelDeque.pop()
     
     print("current circular buffer size: " + str(len(yAccelDeque)))
@@ -149,6 +149,7 @@ def establishConnection(index, buffer_tuple):
 def performHandshake(index):
     global blunoHandshake
     global connections, serviceChars
+    global clearIncomingSerialFlag
     handshake_count = 0
     while blunoHandshake[index] == 0 and handshake_count <= 5:
         print("Performing handshake with bluno " + str(index))
@@ -191,6 +192,7 @@ def reconnect(index, buffer_tuple):
     reconnection_attempts = 0
     blunoHandshake[index] = 0
     connections[index] = None
+    reconnection_count = 0
 
     while True:
         try:
@@ -206,7 +208,7 @@ def reconnect(index, buffer_tuple):
             continue
 
         reconnection_attempts += 1
-        print("Bluno {} Reconnection attempt {}...".format(
+        print("Reconnection attempt {}...".format(
             str(index), str(reconnection_attempts)))
         time.sleep(SLEEP_SEC)
     print("\n\n#################### Successfully reconnected to bluno " +
@@ -273,9 +275,7 @@ class NotificationDelegate(DefaultDelegate):
                 return data
 
         # process data
-        time_recv = time.time()
-        # dt = datetime.datetime.now()
-        # dt = dt.strftime("%m/%d/%Y, %H:%M:%S")
+        timeRecv = time.time()
         packets = data.split(END_FLAG)
 
         # no delimiter is found in split(), drop the whole buffer
@@ -361,11 +361,10 @@ class NotificationDelegate(DefaultDelegate):
                 "AccelX": accel_data_arr[0],
                 "AccelY": accel_data_arr[1],
                 "AccelZ": accel_data_arr[2],
-                "MoveFlag": motion_flag,
+                "moveFlag": motion_flag,
                 "PosChangeFlag": pos_change_flag,
-                "Time": time_recv
+                "time": timeRecv
             }
-            print("Emg: " + str(emg))
             print(packet)
             self.buffer_tuple.put(packet)
 
@@ -407,3 +406,17 @@ def connect_to_pi(_name, buffer_tuple, index):
             print("Expection: " + str(e))
             reconnect(index, buffer_tuple)
             start_t = time.time()
+
+#         waitForAllConnections(index)
+
+def connect_to_ultra96(_name, tuple ):
+    # TODO: Connect to ultra96
+    logging.basicConfig(filename='ble_integrate.log',
+                        filemode='w', level=logging.DEBUG)
+    packet = None
+    while True:
+        packet = None 
+        packet = tuple.get()
+    
+        if packet is not None:
+            logging.debug("{}: Sending new packet: {}".format(datetime.datetime.now(), packet))
