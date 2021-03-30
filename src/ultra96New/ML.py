@@ -72,17 +72,17 @@ def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLoc
                 # print("dataframe retrieved")
                 # print(dataFrame)
                 #loadscale
-                mean = np.load("mean.npy")
+                _mean = np.load("mean.npy")
                 _scale = np.load("scale.npy")
                 numMoves = [0,0,0]
                 final_prediction = -1
                 i = 0
                 for dataFrame in dataFrames:
                     pdDataFrame = pandas.DataFrame(dataFrame)
+                    data_to_evaluate = preprocess.process_data_stream(pdDataFrame)
                     #scale
-                    data = (pdDataFrame - _mean)/_scale
-                    data_to_evaluate = preprocess.process_data_stream(data)
-                    prediction = eval_mlp(data_to_evaluate, tflite_model)
+                    data_scaled = (data_to_evaluate - _mean)/_scale
+                    prediction = eval_mlp(data_scaled, tflite_model)
                     numMoves[prediction] += 1
 
                 max_value = numpy.max(arr)
