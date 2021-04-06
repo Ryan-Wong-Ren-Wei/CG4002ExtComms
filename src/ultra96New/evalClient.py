@@ -92,7 +92,7 @@ class EvalClient():
             positionChange[x] = 0
 
     def handleEval(self, outputForEval, rdyForEval : threading.Event, server: Ultra96Server,
-        globalShutDown: threading.Event, dancerPositions: list, positionChange: list):
+        globalShutDown: threading.Event, dancerPositions: list, positionChange: list, doClockSync: threading.Event):
 
         while True:
             if globalShutDown.is_set():
@@ -119,6 +119,7 @@ class EvalClient():
                 dancerPositions[2] = int(servResponse[2])
                 print("Server updated values:", dancerPositions)
                 rdyForEval.clear()  
+                doClockSync.set()
                 server.broadcastMessage("moveComplete")
             except Exception as e:
                 print("[ERROR][EVALCLIENT]", e)

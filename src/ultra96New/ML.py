@@ -142,6 +142,6 @@ def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLoc
                 print(output)"""
                 # evalClient.sendToEval(action=ENCODE[output],positions=1)
                 
-    except:
-        print(sys.exc_info())
+    except Exception as e:
+        print("[ML.py][ERROR]", e)
         return

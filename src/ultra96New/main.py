@@ -50,7 +50,7 @@ class ControlMain():
         time.sleep(60) 
         executor.submit(handleML, self.dataQueues, self.outputForEval, self.globalShutDown, self.rdyForEval, self.dataQueueLock)
         executor.submit(self.evalClient.handleEval, self.outputForEval, self.rdyForEval, self.server, self.globalShutDown,
-            self.dancerPositions, self.positionChange)
+            self.dancerPositions, self.positionChange, self.doClockSync)
         self.server.broadcastMessage('start')
 
 
