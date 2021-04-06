@@ -51,11 +51,6 @@ class LaptopClient():
                         packet['command'] = 'data'
                         self.sendMessage(json.dumps(packet))
                         # print(packet)
-                    else:
-#                        if self.moveStarted.is_set():
-#                            stopMoveMessage = {"command": "moveComplete"}
-#                            self.sendMessage(stopMoveMessage)     
-                        self.moveStarted.clear()
                 else:
                     print("No packet found...")
                 time.sleep(0.04)
@@ -94,7 +89,9 @@ class LaptopClient():
             if command == "sync":
                 self.startClockSync()
             elif command == "start":
-                self.evalStarted.set() 
+                self.evalStarted.set()
+            elif command == 'moveComplete':
+                self.moveStarted.clear() 
             elif "clocksync" in command:
                 self.respondClockSync(command,timeRecv)
 

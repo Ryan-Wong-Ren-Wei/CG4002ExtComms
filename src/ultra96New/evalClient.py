@@ -119,6 +119,7 @@ class EvalClient():
                 dancerPositions[2] = int(servResponse[2])
                 print("Server updated values:", dancerPositions)
                 rdyForEval.clear()  
+                server.broadcastMessage("moveComplete")
             except Exception as e:
                 print("[ERROR][EVALCLIENT]", e)
                 return

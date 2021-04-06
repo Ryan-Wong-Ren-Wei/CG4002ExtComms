@@ -124,6 +124,7 @@ class Dancer():
                 for _ in range(10):
                     self.sendMessage('sync')
                     self.clockSyncResponseLock.clear()
+                    time.sleep(0.05)
                     self.clockSyncResponseLock.wait()
                 doClockSync.clear()
             except Exception as e:
