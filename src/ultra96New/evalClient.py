@@ -109,6 +109,15 @@ class EvalClient():
                 outputForEval['positions'] = POSITIONS_DICT[positionsStr]
                 print("SENDING TO EVAL SERVER: ", outputForEval)
                 servResponse = self.sendToEval(outputForEval['positions'], outputForEval['action'], outputForEval['delay'])
+                servResponse = servResponse.replace(',','')
+                servResponse = servResponse.replace('[','')
+                servResponse = servResponse.replace(']','')
+                servResponse = servResponse.replace('\'','')
+                servResponse = servResponse.replace(' ','')
+                dancerPositions[0] = int(servResponse[0])
+                dancerPositions[1] = int(servResponse[1])
+                dancerPositions[2] = int(servResponse[2])
+                print("Server updated values:", dancerPositions)
                 rdyForEval.clear()  
             except Exception as e:
                 print("[ERROR][EVALCLIENT]", e)

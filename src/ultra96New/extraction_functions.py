@@ -38,3 +38,9 @@ def get_sma(data):
         sma += abs(xi) + abs(yi) + abs(zi)
     return sma
 
+def get_corr(data):
+    x, y, z = [data[col] for col in data.columns]
+    corrXY, _ = pearsonr(x, y)
+    corrXZ, _ = pearsonr(x, z)
+    corrYZ, _ = pearsonr(y, z)
+    return corrXY, corrXZ, corrYZ

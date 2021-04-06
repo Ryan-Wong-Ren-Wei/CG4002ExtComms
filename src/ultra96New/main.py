@@ -7,7 +7,7 @@ import threading
 from evalClient import EvalClient
 from queue import Queue
 import time
-from dummyML import handleML
+from ML import handleML
 import sys
 
 class ControlMain():
@@ -15,7 +15,7 @@ class ControlMain():
         self.doClockSync = threading.Event()
         self.doClockSync.set()
         self.globalShutDown = threading.Event()
-        self.evalClient = EvalClient('127.0.0.1', 8888, controlMain=self)
+        self.evalClient = EvalClient('137.132.92.127', 8888, controlMain=self)
         self.moveCompletedFlag = threading.Event()
         self.currPrediction = None
         self.dataQueues = [Queue() for _ in range(NUM_DANCERS)]
@@ -47,7 +47,7 @@ class ControlMain():
         
         input("Press Enter to connect to eval server")
         self.evalClient.connectToEval()
-        # time.sleep(60) 
+        time.sleep(60) 
         executor.submit(handleML, self.dataQueues, self.outputForEval, self.globalShutDown, self.rdyForEval, self.dataQueueLock)
         executor.submit(self.evalClient.handleEval, self.outputForEval, self.rdyForEval, self.server, self.globalShutDown,
             self.dancerPositions, self.positionChange)
