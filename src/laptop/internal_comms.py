@@ -1,6 +1,6 @@
 from bluepy.btle import Scanner, DefaultDelegate, Peripheral, BTLEException, BTLEDisconnectError, ADDR_TYPE_RANDOM
 from multiprocessing import Queue, Process
-from collections import deque 
+from collections import deque
 import threading
 import time
 import datetime
@@ -13,13 +13,15 @@ SLEEP_SEC = 0.03  # 30ms
 LONG_SLEEP_SEC = 0.04  # for handshaking 40ms
 SHORT_SLEEP_SEC = 0.02  # 5ms
 
-blunoAddress = ['80:30:DC:D9:0C:A7', '34:14:B5:51:D1:32', '34:14:B5:51:D6:0C']
-# blunoAddress = ['34:14:b5:51:d6:0c', '34:b1:f7:d2:35:f3', '34:14:b5:51:d6:4e']
-blunoHandshake = [0, 0, 0]
-connections = [None]
-serviceChars = [None]
+blunoAddress = ['80:30:DC:D9:0C:A7', '34:B1:F7:D2:35:F3', '34:14:B5:51:D6:0C', '80:30:DC:E9:08:8B', '34:14:B5:51:D1:32', '34:14:B5:51:D6:4E']
+# blunoAddress = ['80:30:DC:D9:0C:A7', '34:14:B5:51:D1:32', '34:14:B5:51:D6:0C', '80:30:DC:E9:08:8B', '34:B1:F7:D2:35:F3', '34:14:B5:51:D6:4E']
+
+blunoHandshake = [0, 0, 0, 0, 0, 0, 0]
+connections = [None, None, None, None, None, None]
+serviceChars = [None, None, None, None, None, None]
 
 yAccelDeque = deque([])
+
 
 def updateYAccelDeque(newYAccel, motion_flag):
     global yAccelDeque
@@ -28,15 +30,16 @@ def updateYAccelDeque(newYAccel, motion_flag):
         yAccelDeque.appendleft(newYAccel)
     else:
         yAccelDeque.appendleft(0)
-    
-    if(len(yAccelDeque)> 30):
+
+    if(len(yAccelDeque) > 30):
         yAccelDeque.pop()
-    
-    print("current circular buffer size: " + str(len(yAccelDeque)))
+
+    # print("current circular buffer size: " + str(len(yAccelDeque)))
+
 
 def getPosChangeFlag():
     global yAccelDeque
-    ## iterate over deque to find max
+    # iterate over deque to find max
     maxY = -900000
     minY = 900000
     maxYIndex = 0
@@ -51,23 +54,40 @@ def getPosChangeFlag():
             maxY = yAccel
             maxYIndex = i
 
-    ## moving right
-    if (minY < -60 and maxY > 80 and minYIndex > maxYIndex):
-        return -1
+    # print("len of buffer= "+str(len(yAccelDeque)))
+    # print("yaccell = " + str(yAccel))
 
-    ## moving left
-    elif (minY < -60 and maxY > 80 and minYIndex < maxYIndex ):
+    # moving right
+    if (len(yAccelDeque) >= 15 and minY < -70 and maxY > 90 and minYIndex < maxYIndex and maxYIndex - minYIndex >= 15):
+        print("right detected###################")
+        # print("min = " + str(minY))
+        # print("minIndex = "+str(minYIndex))
+        # print("max = " + str(maxY))
+        # print("maxIndex = "+str(maxYIndex))
+        yAccelDeque.clear()
         return 1
 
-    ## netural
+    # moving leftsminYIndex
+    elif (len(yAccelDeque) >= 15 and minY < -90 and maxY > 70 and minYIndex > maxYIndex and minYIndex - maxYIndex >= 15):
+        print("##########################left detected")
+        #
+        # print("min = " + str(minY))
+        # print("minIndex = " + str(minYIndex))
+        # print("min = " + str(maxY))
+        # print("maxIndex = "+str(maxYIndex))
+        yAccelDeque.clear()
+        return -1
+
+    # netural
     return 0
-    
-    
+
+
 def calculateChecksum(str):
     result = 0
     for char in str:
         result ^= ord(char)
     return result
+
 
 class BleConnectionError(Exception):
     # Base class ble connection error
@@ -83,9 +103,12 @@ class HandshakeError(Exception):
 class DataProcessingError(Exception):
     def __init__(self, message="Data processing error!"):
         print(message)
-        
+
+
 def printAlert(msg):
-    print("***************************************** {} **************************************".format(msg))
+    pass
+    ##print("***************************************** {} **************************************".format(msg))
+
 
 def sendH(serviceChar):
     try:
@@ -112,13 +135,13 @@ def sendC(serviceChar):
     except:
         print("Fail sending C packet to bluno")
         return False
-    
 
-def waitForAllConnections(blunoId):
-    global blunoHandshake
-    print("Connection Status: {} ".format(str(blunoHandshake)))
-    if sum(blunoHandshake) != len(blunoAddress) and blunoHandshake[blunoId] == 1:
-        time.sleep(LONG_SLEEP_SEC)
+
+# def waitForAllConnections(blunoId):
+#     global blunoHandshake
+#     print("Connection Status: {} ".format(str(blunoHandshake)))
+#     if sum(blunoHandshake) != len(blunoAddress) and blunoHandshake[blunoId] == 1:
+#         time.sleep(LONG_SLEEP_SEC)
 
 def establishConnection(index, buffer_tuple):
     global connections, serviceChars
@@ -145,6 +168,7 @@ def establishConnection(index, buffer_tuple):
                 str(index), str(connection_attempt_count)))
             time.sleep(LONG_SLEEP_SEC)
             continue
+
 
 def performHandshake(index):
     global blunoHandshake
@@ -192,7 +216,6 @@ def reconnect(index, buffer_tuple):
     reconnection_attempts = 0
     blunoHandshake[index] = 0
     connections[index] = None
-    reconnection_count = 0
 
     while True:
         try:
@@ -208,7 +231,7 @@ def reconnect(index, buffer_tuple):
             continue
 
         reconnection_attempts += 1
-        print("Reconnection attempt {}...".format(
+        print("bluno {} Reconnection attempt {}...".format(
             str(index), str(reconnection_attempts)))
         time.sleep(SLEEP_SEC)
     print("\n\n#################### Successfully reconnected to bluno " +
@@ -227,11 +250,10 @@ class NotificationDelegate(DefaultDelegate):
         global blunoHandshake
 
         data = rawData.decode("utf-8")
-        
-        printAlert("Handling notification")
-        print('Connection Index:' + str(self.index))
-        print("Receive data from bluno" + str(self.index) + ": " + data)
-        print(blunoHandshake)
+
+        # print('Connection Index:' + str(self.index))
+        # print(blunoHandshake)
+        # print("Receive data from bluno" + str(self.index) + ": " + data)
         if data == "ACK":
             if blunoHandshake[self.index] == 0:
                 print("Successfully received ACK from Bluno!")
@@ -250,19 +272,20 @@ class NotificationDelegate(DefaultDelegate):
         elif blunoHandshake[self.index] == 1:
             self.handleData(data)
         else:
-            pass
+            pass0;0;0;154;28;-170;0;0
 
     def handleData(self, data):
         self.buffer_str += data
-        remaining_str = self.postProcessing(index=self.index, data=self.buffer_str)
+        remaining_str = self.postProcessing(
+            index=self.index, data=self.buffer_str)
         self.buffer_str = remaining_str
-        
-    
+
     def postProcessing(self, index, data):
         MAX_DATA_LENGTH = 70
         END_FLAG = "\n"
         DELIMITER = ";"
         CHECKSUM_DELIMITER = ":"
+        global yAccelDeque
 
         buffer = ""
         if len(data) < 1:
@@ -275,6 +298,8 @@ class NotificationDelegate(DefaultDelegate):
                 return data
 
         # process data
+        # dt = datetime.datetime.now()
+        # dt = dt.strftime("%m/%d/%Y, %H:%M:%S")
         timeRecv = time.time()
         packets = data.split(END_FLAG)
 
@@ -313,7 +338,7 @@ class NotificationDelegate(DefaultDelegate):
                          Checksum computed: {}\n"
                         .format(checksum_received, checksum_computed))
 
-                print("Check sum passed!")
+                ##print("Check sum passed!")
 
                 content_tokens = tokens[0].split(DELIMITER)
 
@@ -332,22 +357,22 @@ class NotificationDelegate(DefaultDelegate):
                     int(content_tokens[4]),
                     int(content_tokens[5])
                 ]
-                
+
                 motion_flag = int(content_tokens[6])
                 emg = int(content_tokens[7])
-                
+
                 pos_change_flag = 0
-                ## push accelY or 0 to circular buffer
+                # push accelY or 0 to circular buffer
                 updateYAccelDeque(accel_data_arr[1], motion_flag)
 
-                ## get pos change if in neutral
+                # get pos change if in neutral
                 if motion_flag == 0:
                     print("no motion!")
                     pos_change_flag = getPosChangeFlag()
-                    
+
                     if pos_change_flag != 0:
                         print("position change detected!!!")
-                        yAccelDeque.clear() ## clear Deque
+                        yAccelDeque.clear()  # clear Deque
 
             except Exception as e:
                 print("Data corrupted! Parsing error: \n" + str(e))
@@ -365,10 +390,11 @@ class NotificationDelegate(DefaultDelegate):
                 "PosChangeFlag": pos_change_flag,
                 "time": timeRecv
             }
-            print(packet)
+            # print(packet)
             self.buffer_tuple.put(packet)
 
         return buffer
+
 
 def connect_to_pi(_name, buffer_tuple, index):
     global connections
@@ -381,20 +407,20 @@ def connect_to_pi(_name, buffer_tuple, index):
     while True:
         try:
             if(connections[index].waitForNotifications(1)):
-                print("bluno {0} start time updated to {1}".format(
-                    index, start_t))
+                # print("bluno {0} start time updated to {1}".format(
+                #     index, start_t))
                 start_t = time.time()
                 curr_t = time.time()
                 if curr_t - start_t >= 3:
-                    print("bluno {} packet delay more than 3 seconds, performing reconnection...".format(
-                        index))
+                    # print("bluno {} packet delay more than 3 seconds, performing reconnection...".format(
+                    #     index))
                     reconnect(index, buffer_tuple)
                 if curr_t - last_c_packet_t >= 5:
-                    print("Sending packet C to bluno {} at {}, last packet sent at {}, interval is {} seconds"
-                            .format(str(index),
-                                    str(int(curr_t)),
-                                    str(int(last_c_packet_t)),
-                                    str(int(curr_t - last_c_packet_t))))
+                    # print("Sending packet C to bluno {} at {}, last packet sent at {}, interval is {} seconds"
+                    #         .format(str(index),
+                    #                 str(int(curr_t)),
+                    #                 str(int(last_c_packet_t)),
+                    #                 str(int(curr_t - last_c_packet_t))))
                     last_c_packet_t = time.time()
 
                     # Send packet C to bluno to indicate a stable connection
@@ -409,14 +435,16 @@ def connect_to_pi(_name, buffer_tuple, index):
 
 #         waitForAllConnections(index)
 
-def connect_to_ultra96(_name, tuple ):
+
+def connect_to_ultra96(_name, tuple):
     # TODO: Connect to ultra96
     logging.basicConfig(filename='ble_integrate.log',
                         filemode='w', level=logging.DEBUG)
     packet = None
     while True:
-        packet = None 
+        packet = None
         packet = tuple.get()
-    
+
         if packet is not None:
-            logging.debug("{}: Sending new packet: {}".format(datetime.datetime.now(), packet))
+            logging.debug("{}: Sending new packet: {}".format(
+                datetime.datetime.now(), packet))
