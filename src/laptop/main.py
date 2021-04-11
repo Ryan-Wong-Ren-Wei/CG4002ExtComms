@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     inputQueue = Queue()
             
-    blunoProcess = Process(target=internal_comms.connect_to_pi, args=("p1", inputQueue, 0))
+    blunoProcess = Process(target=internal_comms.connect_to_pi, args=("p1", inputQueue, dancerID))
     # blunoProcess = Process(target=blunoDummy, args=(inputQueue,))    
     handleBlunoDataProcess = Process(target=client.handleBlunoData, args=(inputQueue,))
     handleServerProcess = Process(target=client.handleServerCommands)
