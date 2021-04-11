@@ -52,6 +52,24 @@ def eval_mlp(data, tflite_model):
 
     return answer
 
+def most_common(L):
+    # get an iterable of (item, iterable) pairs
+    SL = sorted((x, i) for i, x in enumerate(L))
+    # print 'SL:', SL
+    groups = itertools.groupby(SL, key=operator.itemgetter(0))
+    # auxiliary function to get "quality" for an item
+    def _auxfun(g):
+        item, iterable = g
+        count = 0
+        min_index = len(L)
+        for _, where in iterable:
+        count += 1
+        min_index = min(min_index, where)
+        # print 'item %r, count %r, minind %r' % (item, count, min_index)
+        return count, -min_index
+    # pick the highest-count/earliest item
+  return max(groups, key=_auxfun)[0]
+
 def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLock):
     try:
         # test_model = load_model("MLP")
@@ -63,7 +81,7 @@ def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLoc
             if globalShutDown.is_set():
                 return
             dataFrames = [None for _ in range(NUM_DANCERS)]
-            if dataQueues[0].qsize() > 29 and dataQueues[1].qsize() > 29 and dataQueues[2].qsize() > 29:
+            '''if dataQueues[0].qsize() > 100 and dataQueues[1].qsize() > 100 and dataQueues[2].qsize() > 100:
                 finalPred = [0,0,0]
                 for dancerID in range(3):
                     dataQueue = dataQueues[dancerID]
@@ -99,13 +117,13 @@ def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLoc
                 for dataQueue in dataQueues:
                     while not dataQueue.empty():
                         dataQueue.get()
-                # print("queue > 40, processing data")
-            """if dataQueues[0].qsize() > 29 and dataQueues[1].qsize() > 29 and dataQueues[2].qsize() > 29: 
-                # print("queue > 40, processing data")
+                # print("queue > 40, processing data") '''
+            if dataQueues[0].qsize() > 100 and dataQueues[1].qsize() > 100 and dataQueues[2].qsize() > 100: 
+            
                 for dancerID in range(3):
                     dataQueue = dataQueues[dancerID]
                     dataFrame = []
-                    for _ in range(30):
+                    for _ in range(275):
                         dataPoint = dataQueue.get()
                         dataPoint.pop('moveFlag')
                         dataPoint.pop('Id')
@@ -115,6 +133,9 @@ def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLoc
                 # print("dataframe retrieved")
                 # print(dataFrame)
                 #loadscale
+                for dataFrame in dataFrames:
+                    dataFrame = preprocess.process_data_test(dataFrame)
+
                 _mean = np.load("mean.npy")
                 _scale = np.load("scale.npy")
                 numMoves = [0,0,0]
@@ -123,11 +144,12 @@ def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLoc
                 maxi = 0
                 for dataFrame in dataFrames:
                     pdDataFrame = pandas.DataFrame(dataFrame)
-                    #scalr
-                    data_to_evaluate = preprocess.process_data_stream(pdDataFrame)
-                    data_scaled = (data_to_evaluate - _mean)/_scale
+                    #scale
+                    # data_to_evaluate = preprocess.process_data_stream(pdDataFrame)
+                    data_scaled = (pdDataFrame - _mean)/_scale
                     start = time.time()
-                    prediction = eval_mlp(data_scaled, tflite_model)
+                    predictions = eval_mlp(data_scaled, tflite_model)
+                    prediction = most_common(predictions)
                     print(time.time()-start)
                     numMoves[prediction] += 1
                     if numMoves[prediction] > maxi:
@@ -139,7 +161,7 @@ def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLoc
                 #prediction = random.randint(0,2)
                 output = DECODE[final_prediction]
                 
-                print(output)"""
+                print(output)
                 # evalClient.sendToEval(action=ENCODE[output],positions=1)
                 
     except Exception as e:

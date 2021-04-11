@@ -5,7 +5,7 @@ import extraction_functions
 import numpy as np
 
 # Sampling Rate
-SAMPLING = 30
+SAMPLING = 50
 # Sliding Window Overlap in %
 SLIDING = 0.5
 
@@ -125,11 +125,11 @@ def process_data_stream(data_stream):
     return extracted_feature
 
 
-def process_data_test():
+def process_data_test(data):
     extracted_features = pd.DataFrame()
     col_names = ["accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ"]
 
-    df = pd.read_csv(TEST_DATA_DIR, names=col_names, header=None)
+    df = pd.read_csv(data, names=col_names, header=None)
     segments = segment_data(df)
 
     # extract
