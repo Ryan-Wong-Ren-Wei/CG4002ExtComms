@@ -8,7 +8,7 @@ import sys
 
 def blunoDummy(inputQueue):
     while True:
-        for _ in range(50):
+        for _ in range(150):
             dummy_packet = None
             dummy_packet = {
                         "Id": 1,
@@ -42,7 +42,7 @@ def blunoDummy(inputQueue):
             inputQueue.put(dummy_packet)
             time.sleep(0.04)
 
-        for _ in range(50):
+        for _ in range(150):
             dummy_packet = None
             dummy_packet = {
                         "Id": 1,

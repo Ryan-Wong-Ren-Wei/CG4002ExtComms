@@ -9,12 +9,12 @@ import signal
 import sys
 import multiprocessing
 
-SLEEP_SEC = 0.03  # 30ms
-LONG_SLEEP_SEC = 0.04  # for handshaking 40ms
-SHORT_SLEEP_SEC = 0.02  # 5ms
+SLEEP_SEC = 0.005  # 5ms
+LONG_SLEEP_SEC = 0.01  # for handshaking 10ms
+SHORT_SLEEP_SEC = 0.0002  # 2ms
 
-blunoAddress = ['80:30:DC:D9:0C:A7', '34:B1:F7:D2:35:F3', '34:14:B5:51:D6:0C', '80:30:DC:E9:08:8B', '34:14:B5:51:D1:32', '34:14:B5:51:D6:4E']
-# blunoAddress = ['80:30:DC:D9:0C:A7', '34:14:B5:51:D1:32', '34:14:B5:51:D6:0C', '80:30:DC:E9:08:8B', '34:B1:F7:D2:35:F3', '34:14:B5:51:D6:4E']
+# blunoAddress = ['80:30:DC:D9:0C:A7', '34:B1:F7:D2:35:F3', '34:14:B5:51:D6:0C', '80:30:DC:E9:08:8B', '34:14:B5:51:D1:32', '34:14:B5:51:D6:4E']
+blunoAddress = ['80:30:DC:D9:0C:A7', '34:14:B5:51:D1:32', '34:14:B5:51:D6:0C', '80:30:DC:E9:08:8B', '34:B1:F7:D2:35:F3', '34:14:B5:51:D6:4E']
 
 blunoHandshake = [0, 0, 0, 0, 0, 0, 0]
 connections = [None, None, None, None, None, None]
@@ -70,7 +70,6 @@ def getPosChangeFlag():
     # moving leftsminYIndex
     elif (len(yAccelDeque) >= 15 and minY < -90 and maxY > 70 and minYIndex > maxYIndex and minYIndex - maxYIndex >= 15):
         print("##########################left detected")
-        #
         # print("min = " + str(minY))
         # print("minIndex = " + str(minYIndex))
         # print("min = " + str(maxY))
@@ -135,13 +134,6 @@ def sendC(serviceChar):
     except:
         print("Fail sending C packet to bluno")
         return False
-
-
-# def waitForAllConnections(blunoId):
-#     global blunoHandshake
-#     print("Connection Status: {} ".format(str(blunoHandshake)))
-#     if sum(blunoHandshake) != len(blunoAddress) and blunoHandshake[blunoId] == 1:
-#         time.sleep(LONG_SLEEP_SEC)
 
 def establishConnection(index, buffer_tuple):
     global connections, serviceChars
@@ -272,7 +264,7 @@ class NotificationDelegate(DefaultDelegate):
         elif blunoHandshake[self.index] == 1:
             self.handleData(data)
         else:
-            pass0;0;0;154;28;-170;0;0
+            pass
 
     def handleData(self, data):
         self.buffer_str += data
@@ -406,16 +398,16 @@ def connect_to_pi(_name, buffer_tuple, index):
     last_c_packet_t = time.time()
     while True:
         try:
-            if(connections[index].waitForNotifications(1)):
+            if(connections[index].waitForNotifications(0.3)):
                 # print("bluno {0} start time updated to {1}".format(
                 #     index, start_t))
                 start_t = time.time()
                 curr_t = time.time()
-                if curr_t - start_t >= 3:
+                if curr_t - start_t >= 2:
                     # print("bluno {} packet delay more than 3 seconds, performing reconnection...".format(
                     #     index))
                     reconnect(index, buffer_tuple)
-                if curr_t - last_c_packet_t >= 5:
+                if curr_t - last_c_packet_t >= 3:
                     # print("Sending packet C to bluno {} at {}, last packet sent at {}, interval is {} seconds"
                     #         .format(str(index),
                     #                 str(int(curr_t)),

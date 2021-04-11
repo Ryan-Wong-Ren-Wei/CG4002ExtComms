@@ -1,10 +1,6 @@
 bcrypt          ==3.2.0
 cffi            ==1.14.4
 cryptography    ==3.4.3
-numpy           ==1.20.1
-pandas          ==1.2.2
-paramiko        ==2.7.2
-pip             ==21.0.1
 pycparser       ==2.20
 pycryptodome    ==3.9.9
 pycryptodomex   ==3.9.9
