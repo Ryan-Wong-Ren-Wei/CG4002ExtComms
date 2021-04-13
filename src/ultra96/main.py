@@ -1,86 +1,71 @@
 from concurrent.futures import thread
 from socket import setdefaulttimeout
 import threading
-from server import Ultra96Server
+from server import NUM_DANCERS, Ultra96Server
 import concurrent.futures
 import threading
 from evalClient import EvalClient
 from queue import Queue
 import time
-from dummyML import handleML
+from ML import handleML
 import sys
 
 class ControlMain():
     def __init__(self):
-        self.lockDataQueue = threading.Lock()
-        self.dancerDataDict = {}
-        self.output = None
-        self.moveCompletedFlag = threading.Event()
-        self.globalShutDown = threading.Event()
-
-        #if true, then broadcast clock sync. If false, wait for move eval then set to true
         self.doClockSync = threading.Event()
         self.doClockSync.set()
-
-        self.ultra96Server = Ultra96Server(host='127.0.0.1', port=10022, key="Sixteen byte key", controlMain=self)
+        self.globalShutDown = threading.Event()
         self.evalClient = EvalClient('127.0.0.1', 8888, controlMain=self)
+        self.moveCompletedFlag = threading.Event()
+        self.currPrediction = None
+        self.dataQueues = [Queue() for _ in range(NUM_DANCERS)]
+        self.dataQueueLock = threading.Event()
+        self.outputForEval = {"positions": None, "action" : None, "delay" : None}
+        self.rdyForEval = threading.Event()
+
+        # Logic list of current dancer positions
+        self.dancerPositions = [1,2,3]
+
+        # Logic list of position change data received from laptop
+        self.positionChange = [0,0,0]
+        pass
         
     def run(self):
-        dancerIDList = []
+        self.server = Ultra96Server('127.0.0.1', 10022, 'Sixteen byte key')
         try:
-            self.ultra96Server.initializeConnections()
+            self.server.initializeConnections()
         except Exception as e:
-            print("Error initializing connections: ", e)
-        for key in self.ultra96Server.clients:
-            dancerIDList.append(key)
+            print(e)
+        
         executor = concurrent.futures.ThreadPoolExecutor()
-        print(dancerIDList)
-        
-        for dancer in dancerIDList:
-            executor.submit(self.ultra96Server.handleClient, dancer)
-        
-        
-        # for _ in range(10):
-        #     self.ultra96Server.broadcastMessage('sync')
-        #     time.sleep(0.5)
 
+        self.server.executeClientHandlers(executor, self.dataQueues, self.dataQueueLock, self.positionChange)
         time.sleep(3)
-        for dancer in dancerIDList:
-            executor.submit(self.ultra96Server.handleClockSync, dancer)
+
+        self.server.executeClockSyncHandlers(executor, self.doClockSync)
+        time.sleep(3)
+        
         input("Press Enter to connect to eval server")
-        try:
-            self.evalClient.connectToEval()
-            # time.sleep(60)
-            print("60 seconds time out done, starting evaluation")
-            
-            for dancerID in dancerIDList:
-                executor.submit(handleML, self.dancerDataDict[dancerID], self.output, self.moveCompletedFlag, self.evalClient, self.globalShutDown, self.doClockSync)
-            self.ultra96Server.broadcastMessage('start')
-            # Start ML thingy here
-        except Exception as e:
-            print("Exception, ", e, "Exiting.")
-            self.ultra96Server.broadcastMessage('quit')
-            self.evalClient.sendToEval(quit=True)
-            sys.exit()
+        self.evalClient.connectToEval()
+        # time.sleep(60) 
+        executor.submit(handleML, self.dataQueues, self.outputForEval, self.globalShutDown, self.rdyForEval, self.dataQueueLock, self.doClockSync)
+        executor.submit(self.evalClient.handleEval, self.outputForEval, self.rdyForEval, self.server, self.globalShutDown,
+            self.dancerPositions, self.positionChange, self.doClockSync)
+        self.server.broadcastMessage('start')
+
 
         complete = False
         while not complete:
             try:
-                pass
+                time.sleep(10)
             except KeyboardInterrupt:
                 print("Exiting.")
-                self.ultra96Server.broadcastMessage('quit')
+                self.server.broadcastMessage('quit')
                 self.evalClient.sendToEval(quit=True)
                 complete = True
                 executor.shutdown(wait=False,cancel_futures=True)
                 self.globalShutDown.set()
 
-        # executor.shutdown()
-
-        for key,value in self.dancerDataDict.items():
-            while not value.empty():
-                print(value.get())
-        print(self.dancerDataDict)
 
 if __name__ == "__main__":
     controlMain = ControlMain()

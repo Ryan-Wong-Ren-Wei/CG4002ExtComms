@@ -8,57 +8,93 @@ import time
 from types import DynamicClassAttribute
 from Util.encryption import EncryptionHandler
 
-NUM_DANCERS = 1
+NUM_DANCERS = 3
 
 def variance(data, ddof=0):
     n = len(data)
     mean = sum(data) / n 
     return sum((x - mean) ** 2 for x in data) / (n - ddof)
 
-class Ultra96Server():
-    # Tuple containing "host" and "port" values for ultra96 server
-    connection = ()
+# Class holding various data and functions for each dancer
+class Dancer():
+    def __init__(self, dancerID: int, conn :socket.socket):
+        self.dancerID = dancerID
+        self.conn = conn
+        self.clockSyncResponseLock = threading.Event() # To handle client-server synchronization for clock sync protocol
+        self.encryptionHandler = EncryptionHandler(b'Sixteen byte key')
 
-    # Holds socket address and port for each dancer, tied to dancer id as key
-    clients = {}
+        self.currIndexClockOffset = 9
+        self.last10Offsets = [None for _ in range(10)]
+        self.currAvgOffset = None
+        self.clockSyncCount = 0 
+        self.dataQueue = Queue()
 
-    # Class for handling AES encryption
-    encryptionHandler = None 
-
-    # Holds last timestamps from the 3 dancers/laptops
-    currTimeStamps = {}
-
-    # Holds the last 10 recorded offsets from the 3 dancers
-    # 2d array containing 10 lists of 3 offsets from each dancer 
-    last10Offsets = {}
-
-    # Used to iterate offset list from the back in order to update offsets
-    currIndexClockOffset = {}
-
-    # Holds average offsets for 3 dancers, calculated from last10Offsets
-    currAvgOffsets = {}
-
-    # Booleans to check if current moves have been received for each dancer
-    currentMoveReceived = {}
-
-    # Count to keep track of number of clock sync updates sent from each client
-    # in current rotation (1-10)
-    clocksyncCount = {}
-
-    # To synchronize clock sync broadcasts and offset receiving
-    clockSyncResponseLock = {}
-
-    def __init__(self, host:str, port:int, key:str, controlMain):
-        self.controlMain = controlMain
-        self.connection = (host,port)
-        self.encryptionHandler = EncryptionHandler(key.encode())
-        self.lockDataQueue = controlMain.lockDataQueue
-        self.doClockSync = controlMain.doClockSync
-        self.dancerDataDict = controlMain.dancerDataDict
-        self.moveCompletedFlag = controlMain.moveCompletedFlag
-        self.globalShutDown = controlMain.globalShutDown
+    def handleClient(self, dataQueue, dataQueueLock: threading.Event, positionChange: list):
+        self.dataQueue = dataQueue
+        self.dataQueueLock = dataQueueLock
+        conn = self.conn
+        while True:
+            try:
+                receivedFromBuffer = self.recvall(conn)
+                timerecv = time.time()
+                packets = receivedFromBuffer.decode('utf8').split(",") # Split into b64encoded packets by ',' delimiter
+                packets.pop(-1) # Pop last empty "packet"
+                for packet in packets:
+                    data = self.encryptionHandler.decrypt_message(packet)
+                    if not data:
+                        continue
+                    data = json.loads(data)
+                    # print("Received data:" + json.dumps(data) + "\n")
+                    # print(data.decode("utf8"))
         
+                    if data['command'] == "shutdown":
+                        print(self.dancerID, ' Received shutdown signal\n')
+                        return
+
+                    elif data['command'] == "clocksync":
+                        self.respondClockSync(data['message'], conn, timerecv, self.dancerID)
+
+                    elif data['command'] == "offset":
+                        self.updateOffset(data['message'])
+                        self.clockSyncResponseLock.set()
+                        
+                    elif data['command'] == "timestamp":
+                        # unlock data queue to store data
+                        self.dataQueueLock.clear()
+                        self.updateTimeStamp(data['message'])
+
+                    elif data['command'] == "data":
+                        data.pop('command')
+                        data.pop('PosChangeFlag')
+                        self.addData(data)
+
+                    elif data['command'] == "poschange":
+                        self.updatePosition(data['message'], positionChange)
+
+            except Exception as e:
+                print("[ERROR][HANDLECLIENT]:", self.dancerID, e)
+                return
+    
+    def updatePosition(self, data, positionChange: list):
+        change = int(data)
+        positionChange[self.dancerID] += change
+        print("Dancer", self.dancerID, "Received position change data", data,
+            "\nNewData: ", positionChange)
         return
+    
+    def updateTimeStamp(self, data):
+        timestamp = float(data)
+        relativeTimeStamp = timestamp - self.currAvgOffset
+        self.currTimeStamp = relativeTimeStamp
+        print("Dancer: ", self.dancerID, "bluno recorded TS: ", timestamp, "adjusted TS: ", self.currTimeStamp)
+    
+    def addData(self, data):
+        if not self.dataQueueLock.is_set():
+            self.dataQueue.put(data)
+        else:
+            while not self.dataQueue.empty():
+                self.dataQueue.get()
+
 
     def recvall(self,conn: socket.socket):
         fullMessageReceived = False
@@ -69,182 +105,134 @@ class Ultra96Server():
                 fullMessageReceived = True
         return data
 
+    def respondClockSync(self, message : str, conn: socket.socket, timerecv : float, dancerID):
+        # print(f"Received clock sync request from dancer, {dancerID}")
+        timestamp = message
+        # print(f"t1 =",{timestamp})
+
+        response = json.dumps({'command' : 'clocksync', 'message': str(timerecv) + '|' + str(time.time())})
+        conn.send(self.encryptionHandler.encrypt_msg(response))
+
+    def sendMessage(self, message : str):
+        message = self.encryptionHandler.encrypt_msg(message)
+        self.conn.send(message)
+    
+    def handleClockSync(self, doClockSync: threading.Event, clockSyncHandlerCount, clockSyncCountLock):
+        while True:
+            try:
+                doClockSync.wait()
+                for _ in range(10):
+                    self.sendMessage('sync')
+                    self.clockSyncResponseLock.clear()
+                    time.sleep(0.05)
+                    self.clockSyncResponseLock.wait()
+                clockSyncCountLock.acquire()
+                if clockSyncHandlerCount[0] > 1:
+                    # clockSyncCountLock.acquire()
+                    clockSyncHandlerCount[0] -=  1
+                    # print(self.dancerID, "done", clockSyncHandlerCount)
+                    clockSyncCountLock.release()
+                    while clockSyncHandlerCount[0] != 3:
+                        pass
+                        # print(self.dancerID, "PASS", clockSyncHandlerCount)
+                elif clockSyncHandlerCount[0] == 1:
+                    doClockSync.clear()
+                    clockSyncHandlerCount[0] = 3
+                    clockSyncCountLock.release()
+                    
+                # doClockSync.clear()
+            except Exception as e:
+                print(e)
+                return
+
+    def updateOffset(self, message: str):
+        self.last10Offsets[self.currIndexClockOffset] = float(message)
+        self.currIndexClockOffset = (self.currIndexClockOffset - 1) % 10
+
+        if self.clockSyncCount != 10:
+            self.clockSyncCount += 1
+
+        if self.clockSyncCount == 10:
+            self.updateAvgOffset()
+            self.clockSyncCount = 0
+            
+        # print("Updating dancer " + str(self.dancerID) + " offset to: " + message + "\n")
+        return
+
+    def updateAvgOffset(self):
+        offsetSum = 0
+        numOffsets = 10
+        for offset in self.last10Offsets:
+            offsetSum += offset
+        self.currAvgOffset = offsetSum/numOffsets
+        print("Dancer: ", str(self.dancerID), "average offset: ", self.currAvgOffset)
+
+
+
+class Ultra96Server():
+    def __init__(self, host:str, port:int, key:str):
+        # each value in list holds dancer class
+        self.addr = (host,port)
+        self.dancers = [Dancer(0, None), Dancer(0, None), Dancer(0, None)]
+        self.encryptionHandler = EncryptionHandler(key.encode('utf8'))
+        self.globalShutDown = threading.Event()
+
     def initializeConnections(self, numDancers = NUM_DANCERS):
-        mySocket = socket.socket()
+        socket96 = socket.socket()
         # host,port = self.connection
-        mySocket.bind((self.connection))
-        mySocket.listen(5)
+        socket96.bind((self.addr))
+        socket96.listen(3)
 
         try:
             for _ in range(numDancers):
-                conn,addr = mySocket.accept()
-                print(conn,addr)
-                # data = conn.recv(4096)
-                data = self.recvall(conn)
-                print(data)
-                data = self.encryptionHandler.decrypt_message(data)
-                print("Dancer ID: ", data)
-                self.clients[data] = (conn,addr)
-                print(addr, '\n')
+                conn,addr = socket96.accept()
+                messageRecv = self.recvall(conn)
+                dancerID = self.encryptionHandler.decrypt_message(messageRecv)
+                print("Accepted connection from:", addr, "Dancer ID: ", dancerID)
 
-                self.currIndexClockOffset[data] = 9 # initialize index counter to 9 for each dancer
-                self.last10Offsets[data] = [None for _ in range(10)] # initialize last 10 offsets for dancer id to None
-                self.currAvgOffsets[data] = None
-                self.currentMoveReceived[data] = False
-                self.clocksyncCount[data] = 0
-                self.dancerDataDict[data] = Queue()
-                self.clockSyncResponseLock[data] = threading.Event()
-            return 
-        except:
-            print(sys.exc_info(), "\n")
-            return
+                dancerID = int(dancerID)
+                if dancerID not in [0,1,2]:
+                    raise Exception("Dancer ID invalid, must be integer value 0,1 or 2") 
+                self.dancers[dancerID] = Dancer(dancerID, conn)
 
-    def calculateSyncDelay(self):
-        sortedTimestamps = sorted(self.currTimeStamps.values())
-        return (sortedTimestamps[-1] - sortedTimestamps[0])
+        except Exception as e:
+            print("[ERROR][initializeConnections]", e)
 
-    def addData(self, dancerID, data):
-        with self.lockDataQueue:
-            if not self.moveCompletedFlag.is_set():
-                self.dancerDataDict[dancerID].put(data)
-            else:
-                while not self.dancerDataDict[dancerID].empty():
-                    self.dancerDataDict[dancerID].get()
+    def executeClientHandlers(self, executor, dataQueues, dataQueueLock, positionChange):
+        dancerID = 0
+        for dancer in self.dancers:
+            executor.submit(dancer.handleClient, dataQueues[dancerID], dataQueueLock, positionChange)
+            dancerID += 1
+    
+    def executeClockSyncHandlers(self, executor, doClockSync: threading.Event):
+        self.clockSyncHandlerCount = [3]
+        self.clockSyncCountLock = threading.Lock()
+        for dancer in self.dancers:
+            executor.submit(dancer.handleClockSync, doClockSync, self.clockSyncHandlerCount, self.clockSyncCountLock)
 
-    def updateTimeStamp(self, message : str, dancerID):
-        print("Evaluating move...")
-        print(f"time recorded by bluno:", {message})
-
-        #calculate relative time using offset
-        timestamp = float(message)
-        relativeTS = timestamp - self.currAvgOffsets[dancerID]
-        self.currTimeStamps[dancerID] = relativeTS
-        print(dancerID, "adjusted timestamp: ", relativeTS)
-
-    def handleClient(self, dancerID : str):
-        conn,addr = self.clients[dancerID]
-        while True:
-            if self.globalShutDown.is_set():
-                return
-            try:
-                # receivedFromBuffer = conn.recv(4096)
-                receivedFromBuffer = self.recvall(conn)
-                timerecv = time.time()
-                packets = receivedFromBuffer.decode('utf8').split(",") #Split into b64encoded packets by ',' delimiter
-                packets.pop(-1)
-                # print("data received at ", timerecv, data)
-                for packet in packets:
-                    data = self.encryptionHandler.decrypt_message(packet)
-                    if not data:
-                        continue
-                    data = json.loads(data)
-                    # print("Received data:" + json.dumps(data) + "\n")
-                    # print(data.decode("utf8"))
-        
-                    if data['command'] == "shutdown":
-                        print(dancerID, ' Received shutdown signal\n')
-                        break
-                    elif data['command'] == "clocksync":
-                        self.respondClockSync(data['message'], dancerID, timerecv)
-                    elif data['command'] == "offset":
-                        self.clockSyncResponseLock[dancerID].set()
-                        self.updateOffset(data['message'], dancerID)
-                    elif data['command'] == "timestamp":
-                        self.moveCompletedFlag.clear()
-                        self.updateTimeStamp(data['message'], dancerID)
-                        self.currentMoveReceived[dancerID] = True
-                        # if all(value == True for value in self.currentMoveReceived.values()):
-                        #     print(f"Sync delay calculated:", {self.calculateSyncDelay()})
-                        #     self.currentMoveReceived = {key: False for key in self.currentMoveReceived.keys()}
-                    elif data['command'] == "data":
-                        data.pop('command')
-                        self.addData(dancerID, data)
-                    elif data['command'] == "moveComplete":
-                        pass
-                        # self.moveCompletedFlag.clear()
-            except UnicodeDecodeError:
-
-                print("Packet incorrectly received")
-                pass
-            except Exception as e:
-                print("[ERROR][", dancerID, "] -> ", e)
-                print(self.dancerDataDict[dancerID].qsize())
-                pass
-
-            # decrypted_msg = encryptionHandler.decrypt_message(data)
-        print(dancerID, " RETURNING\n")
-        return
-
-
-    def handleClockSync(self, dancerID):
-        while True:
-            if self.globalShutDown.is_set():
-                return
-            self.doClockSync.wait()
-            for _ in range(10):
-                self.broadcastMessage('sync')
-                self.clockSyncResponseLock[dancerID].clear()
-                self.clockSyncResponseLock[dancerID].wait()
-            self.doClockSync.clear()
-
-    # Check if variance between 10 offsets in dancerID is too high.
-    # If so, force another 10 updates with the specific dancerID
-    def checkOffsetVar(self, dancerID):
-        conn,addr = self.clients[dancerID]
-        self.updateAvgOffset()
-
-        varLast10 = variance(self.last10Offsets[dancerID])
-        print("VARIANCE FOR DANCER: ", dancerID, varLast10)
-        if varLast10 > 1e-05:
-            print("Offset variance too high: ", "varLast10",
-                "Resyncing for Dancer: ", dancerID)
-            conn.send(self.encryptionHandler.encrypt_msg("sync"))
-        
-        return
-            
-    def updateOffset(self, message: str, dancerID):
-        # self.offsetLock.acquire()
-        # print(f"{dancerID} has received offsetlock")
-        self.last10Offsets[dancerID][self.currIndexClockOffset[dancerID]] = float(message)
-        self.currIndexClockOffset[dancerID] = (self.currIndexClockOffset[dancerID] - 1) % 10
-        # print(f"{dancerID} is releasing offsetlock")
-        # self.offsetLock.release()
-
-        if self.clocksyncCount[dancerID] != 10:
-            self.clocksyncCount[dancerID] += 1
-
-        if self.clocksyncCount[dancerID] == 10:
-            self.checkOffsetVar(dancerID)
-            self.clocksyncCount[dancerID] = 0
-            
-        print("Updating dancer " + str(dancerID) + " offset to: " + message + "\n")
-        return
+    def recvall(self,conn: socket.socket):
+        fullMessageReceived = False
+        data = b''
+        while not fullMessageReceived:
+            data += conn.recv(1024)
+            if data[-1] == 44: # 44 corresponds to ',' which is delimiter for end of b64 encoded msg
+                fullMessageReceived = True
+        return data
 
     def broadcastMessage(self, message):
         print("BROADCASTING: ", message)
         message = self.encryptionHandler.encrypt_msg(message)
-        for conn, addr in self.clients.values():
-            conn.send(message)
+        for dancer in self.dancers:
+            dancer.conn.send(message)
 
-    def respondClockSync(self, message : str, dancerID, timerecv):
-        print(f"Received clock sync request from dancer, {dancerID}")
-        timestamp = message
-        print(f"t1 =",{timestamp})
-        conn, addr = self.clients[dancerID]
+    def getSyncDelay(self) -> float:
+        timeStampList = []
+        for dancer in self.dancers:
+            timeStampList.append(dancer.currTimeStamp)
+        sortedTimeStamps = sorted(timeStampList)
+        return sortedTimeStamps[NUM_DANCERS - 1] - sortedTimeStamps[0]
 
-        # response = str(timerecv) + "|" + str(time.time())
-        response = json.dumps({'command' : 'clocksync', 'message': str(timerecv) + '|' + str(time.time())})
-        conn.send(self.encryptionHandler.encrypt_msg(response))
 
-    def updateAvgOffset(self):
-        for dancerID, offsetList in self.last10Offsets.items():
-            currSum = 0
-            numOffsets = 10
-            for offset in offsetList:
-                if offset is None:
-                    numOffsets -= 1
-                    continue
-                currSum += offset
-            if numOffsets == 0:
-                continue
-            self.currAvgOffsets[dancerID] = currSum/numOffsets
+if __name__ == "__main__":
+    server = Ultra96Server('127.0.0.1', 10022, 'Sixteen byte key')
+    server.initializeConnections()
