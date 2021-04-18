@@ -10,12 +10,15 @@ ACTIONS = ['dab', 'elbowkick', 'gun', 'hair', 'listen', 'pointhigh', 'sidepump',
 
 class EvalClient():
     def __init__(self, host:str, port:int, controlMain):
+        self.moveCounter = 0
         self.controlMain = controlMain
         self.server = (host,port)
         self.encryptionHandler = EncryptionHandler(b'Sixteen byte key')
         pass
 
     def sendToEval(self, positions=randint(0,5), action=None, sync_delay=0, quit=False):
+        if self.moveCounter == 24:
+            quit = True
         if quit:
             message = '# |logout| '
         else:
@@ -31,6 +34,7 @@ class EvalClient():
             
         data = self.evalSocket.recv(1024).decode()
         print ('Received from server: ' + data)
+        self.moveCounter += 1
         return data
     
     def updateDancerPositions(self, dancerPositions, positionChange):
@@ -114,9 +118,9 @@ class EvalClient():
                 servResponse = servResponse.replace(']','')
                 servResponse = servResponse.replace('\'','')
                 servResponse = servResponse.replace(' ','')
-                #dancerPositions[0] = int(servResponse[0])
-                #dancerPositions[1] = int(servResponse[1])
-                #dancerPositions[2] = int(servResponse[2])
+                dancerPositions[0] = int(servResponse[0])
+                dancerPositions[1] = int(servResponse[1])
+                dancerPositions[2] = int(servResponse[2])
                 print("Server updated values:", dancerPositions)
                 rdyForEval.clear()  
                 # doClockSync.set()

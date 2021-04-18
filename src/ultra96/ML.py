@@ -13,6 +13,7 @@ import random
 # from keras.models import load_model
 knn = pickle.load(open('knnpickle_file', 'rb'))
 dabpoint = pickle.load(open('dab-pointhigh', 'rb'))
+wipelisten = pickle.load(open('wipelisten', 'rb'))
 DECODE = {0: "dab", 1: "elbowkick", 2: "gun", 3: "hair", 4: "listen", 5: "pointhigh", 6: "sidepump", 7: "wipetable"}
 ENCODE = {"dab": 0, "elbowkick": 1, "gun": 2, "hair": 3, "listen": 4, "pointhigh": 5, "sidepump": 6, "wipetable": 7}
 # class ML:
@@ -89,7 +90,16 @@ def handleML(dataQueues, outputForEval, globalShutDown, rdyForEval, dataQueueLoc
                         pred = counts.index(max(counts))
                         counts[5] = counts[2]
                         counts[2] = 0
-
+                    if pred == 4:
+                        counts =  [0,0,0,0,0,0,0,0]
+                        predictions = wipelisten.predict(dataFrame)
+                        for h in predictions:
+                            counts[h] +=1 
+                        pred = counts.index(max(counts))
+                        counts[7] = counts[1]
+                        counts[4] = counts[0]
+                        counts[1] = 0
+                        counts[0] = 0
 
                     for i in range(8):
                         finalPred[i] += counts[i]
